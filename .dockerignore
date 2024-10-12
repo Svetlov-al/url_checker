@@ -1,0 +1,33 @@
+# Игнорируем pyc-файлы и кэш
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Игнорируем виртуальные окружения
+env/
+venv/
+
+# Игнорируем системные файлы и логи
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Игнорируем тестовые кэши и артефакты
+.tox/
+.coverage
+.coverage.*
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# Игнорируем git и его кэш
+.git/
+.gitignore
+
+# Кэш инструментов
+.mypy_cache/
+.pytest_cache/
+.hypothesis/
