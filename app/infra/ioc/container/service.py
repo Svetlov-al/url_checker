@@ -19,6 +19,7 @@ class ServicesContainer(containers.DeclarativeContainer):
     create_links_service: Factory[CreateLinksService] = providers.Factory(
         CreateLinksService,
         repo=infrastructure.link_repo.provided,
+        kafka_broker=core.kafka_broker.provided,
     )
 
     get_good_links_service: Factory[GetGoodLinksService] = providers.Factory(

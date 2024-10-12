@@ -5,15 +5,15 @@ from adapters.orm import LinkModel
 
 
 @dataclass
-class Link:
+class LinkEntity:
     url: str
     id: int | None = None  # noqa: A003
     virus_total: bool = False
     updated_at: datetime | None = None
 
     @classmethod
-    def from_domain(cls, link_model: LinkModel) -> "Link":
-        """Создает объект Link из модели SQLAlchemy."""
+    def from_domain(cls, link_model: LinkModel) -> "LinkEntity":
+        """Создает объект LinkEntity из модели SQLAlchemy."""
         return cls(
             id=link_model.id,
             url=link_model.url,
@@ -22,7 +22,7 @@ class Link:
         )
 
     def to_domain(self) -> LinkModel:
-        """Преобразует объект Link в модель SQLAlchemy."""
+        """Преобразует объект LinkEntity в модель SQLAlchemy."""
         return LinkModel(
             url=self.url,
             virus_total=self.virus_total,

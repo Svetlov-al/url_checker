@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from domain import model
+from domain.entities.link_entity import LinkEntity
 
 
 class LinkDetailSchema(BaseModel):
@@ -12,7 +12,7 @@ class LinkDetailSchema(BaseModel):
     updated_at: datetime
 
     @classmethod
-    def from_entity(cls, link: model.Link) -> 'LinkDetailSchema':
+    def from_entity(cls, link: LinkEntity) -> 'LinkDetailSchema':
         return cls(
             id=link.id,
             url=link.url,

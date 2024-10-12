@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from adapters.repository import AbstractRepository
 from dtos.get_link_dto import GetLinkDTO
 
-from domain import model
+from domain.entities.link_entity import LinkEntity
 from domain.exceptions.link_not_found_exception import LinkNotFoundException
 
 
@@ -11,7 +11,7 @@ from domain.exceptions.link_not_found_exception import LinkNotFoundException
 class GetLinkByTitleService:
     repo: AbstractRepository
 
-    async def run(self, params: GetLinkDTO) -> model.Link:
+    async def run(self, params: GetLinkDTO) -> LinkEntity:
         result = await self.repo.get(
             url=params.url,
         )

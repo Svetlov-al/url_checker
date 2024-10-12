@@ -24,5 +24,5 @@ class LinkModel(Base):
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
 
     def __repr__(self):
-        return (f"<Link(id={self.id}, url='{self.url}', virus_total={self.virus_total}, "
+        return (f"<LinkModel(id={self.id}, url='{self.url}', virus_total={self.virus_total}, "
                 f"created_at={self.created_at}, updated_at={self.updated_at})>")

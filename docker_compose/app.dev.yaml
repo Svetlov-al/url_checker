@@ -1,5 +1,6 @@
 networks:
   dev:
+    driver: bridge
 
 services:
   main-app:
@@ -7,6 +8,9 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
+
+    environment:
+      KAFKA_URL: ${KAFKA_URL:?}
 
     ports:
       - ${API_PORT:?}:8000
@@ -18,6 +22,10 @@ services:
       - ../app/:/app/
       - ../migrations/:/migrations/
     networks:
-      dev:
+      - dev
+
+    depends_on:
+      kafka:
+        condition: service_healthy
 
     command: "uvicorn --factory application.api.main:create_app --timeout-graceful-shutdown 2 --host ${API_HOST:?} --port ${API_PORT:?} --reload"

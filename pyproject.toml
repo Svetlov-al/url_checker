@@ -17,6 +17,8 @@ alembic = "^1.13.3"
 python-dotenv = "^1.0.1"
 asyncpg = "^0.29.0"
 psycopg2-binary = "^2.9.9"
+aiokafka = "^0.11.0"
+orjson = "^3.10.7"
 
 
 [build-system]

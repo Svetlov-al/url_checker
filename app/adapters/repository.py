@@ -6,26 +6,26 @@ from adapters.orm import LinkModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from domain import model
+from domain.entities.link_entity import LinkEntity
 
 
 class AbstractRepository(abc.ABC):
     __model = None
 
     @abc.abstractmethod
-    async def add(self, link: model.Link):
+    async def add(self, link: LinkEntity) -> None:
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def get(self, url: str) -> model.Link | None:
+    async def get(self, url: str) -> LinkEntity | None:
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def get_list(self, limit: int, offset: int, virus_total: bool) -> list[model.Link]:
+    async def get_list(self, limit: int, offset: int, virus_total: bool) -> list[LinkEntity]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def create_many(self, links: list[model.Link]) -> None:
+    async def create_many(self, links: list[LinkEntity]) -> None:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -39,12 +39,12 @@ class LinkRepository(AbstractRepository):
     def __init__(self, session_factory: Callable[..., AbstractContextManager[AsyncSession]]) -> None:
         self.session_factory = session_factory
 
-    async def add(self, link: model.Link) -> None:
+    async def add(self, link: LinkEntity) -> None:
         async with self.session_factory() as session:
             session.add(link.to_domain())
             await session.commit()
 
-    async def get(self, url: str) -> model.Link | None:
+    async def get(self, url: str) -> LinkEntity | None:
         async with self.session_factory() as session:
             link_model = (
                 (
@@ -61,9 +61,9 @@ class LinkRepository(AbstractRepository):
             if not link_model:
                 return None
 
-            return model.Link.from_domain(link_model)
+            return LinkEntity.from_domain(link_model)
 
-    async def get_list(self, limit: int, offset: int, virus_total: bool) -> list[model.Link]:
+    async def get_list(self, limit: int, offset: int, virus_total: bool) -> list[LinkEntity]:
         async with self.session_factory() as session:
             results = (
                 (
@@ -77,9 +77,9 @@ class LinkRepository(AbstractRepository):
                 .scalars()
                 .all()
             )
-            return [model.Link.from_domain(link) for link in results]
+            return [LinkEntity.from_domain(link) for link in results]
 
-    async def create_many(self, links: list[model.Link]) -> None:
+    async def create_many(self, links: list[LinkEntity]) -> None:
         async with self.session_factory() as session:
             link_models = [link.to_domain() for link in links]
             session.add_all(link_models)
