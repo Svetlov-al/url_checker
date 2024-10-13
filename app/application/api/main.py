@@ -12,7 +12,7 @@ from infra.settings.stage.app import AppSettings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db = app.container.core.container.db.provided() # noqa
+    db = app.container.core.container.db.provided()  # noqa
     await db.create_database()
     yield
 
@@ -25,6 +25,7 @@ def create_app() -> FastAPI:
         **settings.fastapi_kwargs,
         lifespan=lifespan,
     )
+
     app.container = container
     app.include_router(create_links_router, prefix='/urls')
     app.include_router(get_good_links_router, prefix='/urls')

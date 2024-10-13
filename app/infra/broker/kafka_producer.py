@@ -1,24 +1,20 @@
 import logging
 from dataclasses import dataclass
-from typing import AsyncIterator
 
-import orjson
-from aiokafka import AIOKafkaConsumer
 from aiokafka.producer import AIOKafkaProducer
 
-from infra.broker.base import BaseMessageBroker
+from infra.broker.base import BaseProducer
 
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class KafkaMessageBroker(BaseMessageBroker):
+class KafkaMessageProducer(BaseProducer):
     producer: AIOKafkaProducer
-    consumer: AIOKafkaConsumer
 
     async def publish_message(self, key: bytes, topic: str, value: bytes):
-        await self.producer.start()
+        await self.start()
         try:
             await self.producer.send(
                 topic=topic,
@@ -31,21 +27,27 @@ class KafkaMessageBroker(BaseMessageBroker):
                 f"Erro: {e}",
             )
         finally:
-            await self.producer.stop()
+            await self.close()
 
-    async def start_consuming(self, topic: str) -> AsyncIterator[dict]:
-        self.consumer.subscribe(topics=[topic])
-
-        async for message in self.consumer:
-            yield orjson.loads(message.value)
-
-    async def stop_consuming(self) -> None:
-        self.consumer.unsubscribe()
+    async def publish_batch(self, topic: str, key: bytes, messages: list[bytes]):
+        await self.start()
+        try:
+            for message in messages:
+                await self.producer.send(
+                    topic=topic,
+                    key=key,
+                    value=message,
+                )
+        except Exception as e:
+            logger.error(
+                f"[Kafka]: Ошибка при отправке сообщения:\n"
+                f"Erro: {e}",
+            )
+        finally:
+            await self.close()
 
     async def close(self):
-        await self.consumer.stop()
         await self.producer.stop()
 
     async def start(self):
         await self.producer.start()
-        await self.consumer.start()

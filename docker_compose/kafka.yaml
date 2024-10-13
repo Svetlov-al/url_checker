@@ -12,6 +12,10 @@ services:
     ports:
       - "22181:2181"
 
+    volumes:
+      - zksingle-ksingle_zookeeper-data:/var/lib/zookeeper/data
+      - zksingle-ksingle_zookeeper-log:/var/lib/zookeeper/log
+      - zksingle-ksingle_zookeeper-secrets:/etc/zookeeper/secrets
     networks:
       - dev
 
@@ -29,6 +33,11 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_RETENTION_MS: 604800000
+
+    volumes:
+      - zksingle-ksingle_broker-data:/var/lib/kafka/data
+      - zksingle-ksingle_broker-secrets:/etc/kafka/secrets
     healthcheck:
       test: nc -z localhost 29092
 
@@ -48,3 +57,10 @@ services:
 
     networks:
       - dev
+
+volumes:
+  zksingle-ksingle_broker-data:
+  zksingle-ksingle_broker-secrets:
+  zksingle-ksingle_zookeeper-data:
+  zksingle-ksingle_zookeeper-log:
+  zksingle-ksingle_zookeeper-secrets:

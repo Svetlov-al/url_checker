@@ -1,6 +1,6 @@
 import abc
 from collections.abc import Callable
-from contextlib import AbstractContextManager
+from typing import AsyncContextManager
 
 from adapters.orm import LinkModel
 from sqlalchemy import select
@@ -25,7 +25,7 @@ class AbstractRepository(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def create_many(self, links: list[LinkEntity]) -> None:
+    async def create_many(self, links: list[LinkEntity]) -> list[LinkEntity]:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -36,7 +36,7 @@ class AbstractRepository(abc.ABC):
 class LinkRepository(AbstractRepository):
     __model = LinkModel
 
-    def __init__(self, session_factory: Callable[..., AbstractContextManager[AsyncSession]]) -> None:
+    def __init__(self, session_factory: Callable[..., AsyncContextManager[AsyncSession]]) -> None:
         self.session_factory = session_factory
 
     async def add(self, link: LinkEntity) -> None:
@@ -79,11 +79,21 @@ class LinkRepository(AbstractRepository):
             )
             return [LinkEntity.from_domain(link) for link in results]
 
-    async def create_many(self, links: list[LinkEntity]) -> None:
+    async def create_many(self, links: list[LinkEntity]) -> list[LinkEntity]:
         async with self.session_factory() as session:
             link_models = [link.to_domain() for link in links]
             session.add_all(link_models)
             await session.commit()
+
+            return [
+                LinkEntity(
+                    id=link_model.id,
+                    url=link_model.url,
+                    virus_total=link_model.virus_total,
+                    updated_at=link_model.updated_at,
+                )
+                for link_model in link_models
+            ]
 
     async def get_existing_links(self, urls: list[str]) -> list[str]:
         async with self.session_factory() as session:

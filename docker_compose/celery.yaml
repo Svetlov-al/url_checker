@@ -1,0 +1,51 @@
+networks:
+  dev:
+
+  celery:
+    build:
+      context: ..
+    container_name: celery
+    command: celery
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    networks:
+      - dev
+
+  celery_beat:
+    build:
+      context: ..
+    container_name: celery_beat
+    command: beat
+    depends_on:
+      - backend
+      - db
+      - redis
+    env_file:
+      - .env
+    networks:
+      - dev
+
+  redis:
+    image: "redis:alpine"
+    restart: always
+    container_name: redis
+    expose:
+      - "6379"
+    env_file:
+      - .env
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli ping | grep PONG" ]
+      interval: 10s
+      timeout: 30s
+      retries: 5
+      start_period: 80s
+    networks:
+      - dev
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
+    name: redis_data

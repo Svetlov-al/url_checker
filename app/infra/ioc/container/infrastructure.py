@@ -12,6 +12,8 @@ from dependency_injector.providers import (
 )
 
 from infra.ioc.container.core import CoreContainer
+from infra.message_processor.base import IMessageProcessor
+from infra.message_processor.message_processor import VirusTotalChecker
 
 
 class InfrastructureContainer(containers.DeclarativeContainer):
@@ -20,4 +22,8 @@ class InfrastructureContainer(containers.DeclarativeContainer):
     link_repo: Factory[AbstractRepository] = providers.Factory(
         LinkRepository,
         session_factory=core.db.provided.session,
+    )
+
+    message_processor: Factory[IMessageProcessor] = providers.Factory(
+        VirusTotalChecker,
     )
