@@ -43,3 +43,7 @@ cp .env.example .env
 
 
 * `make upgrade` - Применить миграции
+
+
+* `make celery` - Поднять Celery/Flower/Redis для ассинхронных задач
+* `make celery-down` - Остановить контейнеры Celery/Flower/Redis

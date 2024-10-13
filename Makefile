@@ -3,6 +3,7 @@ APP_DEV = docker_compose/app.dev.yaml
 KAFKA = docker_compose/kafka.yaml
 POSTGRES = docker_compose/postgres.yaml
 APP_SERVICE = main-app
+CELERY = docker_compose/celery.yaml
 ENV = --env-file .env
 
 .PHONY: up
@@ -35,8 +36,17 @@ down-dev:
 
 .PHONY: shell
 shell:
-	${DC} -f ${APP_DEV} ${ENV} exec -it ${APP_SERVICE} bash
+	${DC} -f ${APP_DEV} -f ${KAFKA} ${ENV} exec -it ${APP_SERVICE} bash
 
 .PHONY: upgrade
 upgrade:
 	${DC} -f ${APP_DEV} ${ENV} exec -it ${APP_SERVICE} bash -c "cd / && alembic upgrade head"
+
+
+.PHONY: celery
+celery:
+	${DC} -f ${CELERY} ${ENV} up -d --build
+
+.PHONY: celery-down
+celery-down:
+	${DC} -f ${CELERY} ${ENV} down

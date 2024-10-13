@@ -1,10 +1,7 @@
 from celery import Celery
 
 
-celery_app = Celery('tasks')
-celery_app.config_from_object('celery_config')
+celery_app = Celery('tasks', broker='redis://redis/0', backend='redis://redis/0')
 
-
-@celery_app.task
-def test_task() -> None:
-    print("hello from celery")
+celery_app.conf.broker_connection_retry_on_startup = True
+celery_app.autodiscover_tasks(['infra.celery.tasks'])
