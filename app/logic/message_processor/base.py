@@ -10,5 +10,5 @@ from aiokafka import ConsumerRecord
 @dataclass
 class IMessageProcessor(ABC):
     @abstractmethod
-    async def process_batch(self, api_key: str, messages: list[ConsumerRecord]) -> None:
+    async def process_batch(self, api_key: str, messages: list[ConsumerRecord]) -> dict[int, bool]:
         raise NotImplementedError

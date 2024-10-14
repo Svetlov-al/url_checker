@@ -61,11 +61,11 @@ class LinkRepository(AbstractRepository):
             if not link_model:
                 return None
 
-            return LinkEntity.from_domain(link_model)
+            return self._from_orm(link_model)
 
     async def get_list(self, limit: int, offset: int, virus_total: bool) -> list[LinkEntity]:
         async with self.session_factory() as session:
-            results = (
+            link_models = (
                 (
                     await session.execute(
                         select(self.__model)
@@ -77,30 +77,42 @@ class LinkRepository(AbstractRepository):
                 .scalars()
                 .all()
             )
-            return [LinkEntity.from_domain(link) for link in results]
+            return [self._from_orm(link_model) for link_model in link_models]
 
     async def create_many(self, links: list[LinkEntity]) -> list[LinkEntity]:
         async with self.session_factory() as session:
-            link_models = [link.to_domain() for link in links]
+            link_models: list[LinkModel] = [self._to_orm(link) for link in links]
+
             session.add_all(link_models)
+
             await session.commit()
 
-            return [
-                LinkEntity(
-                    id=link_model.id,
-                    url=link_model.url,
-                    virus_total=link_model.virus_total,
-                    updated_at=link_model.updated_at,
-                )
-                for link_model in link_models
-            ]
+            return [self._from_orm(link_model) for link_model in link_models]
 
     async def get_existing_links(self, urls: list[str]) -> list[str]:
         async with self.session_factory() as session:
-            results = (
+            link_models = (
                 await session.execute(
                     select(self.__model.url)
                     .filter(self.__model.url.in_(urls)),
                 )
             )
-            return list(results.scalars().all())
+            return list(link_models.scalars().all())
+
+    @staticmethod
+    def _to_orm(link_entity: LinkEntity) -> LinkModel:
+        """Преобразует доменную сущность в ORM модель."""
+        return LinkModel(
+            url=link_entity.url,
+            virus_total=link_entity.virus_total,
+        )
+
+    @staticmethod
+    def _from_orm(link_model: LinkModel) -> LinkEntity:
+        """Преобразует ORM модель в доменную сущность."""
+        return LinkEntity(
+            id=link_model.id,
+            url=link_model.url,
+            virus_total=link_model.virus_total,
+            updated_at=link_model.updated_at,
+        )

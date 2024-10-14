@@ -8,23 +8,25 @@ services:
     ports:
       - "6379:6379"
     networks:
-      - dev  # Сетевые настройки должны быть здесь
+      - dev
 
   celery_worker:
     container_name: celery_worker
     build: ..
-    command: celery -A infra.celery.celery_worker worker --pool=solo --loglevel=info
+    command: celery -A infra.celery_worker worker --pool=solo --loglevel=info
     volumes:
-      - ../app/:/app/
+      - ../app:/src/app
     depends_on:
       - redis
     networks:
       - dev
+    env_file:
+      - ../.env
 
   flower:
     container_name: flower
     build: ..
-    command: celery -A infra.celery.celery_worker flower --port=5555
+    command: celery -A infra.celery_worker flower --port=5555
     ports:
       - "5555:5555"
     depends_on:
@@ -32,3 +34,5 @@ services:
       - celery_worker
     networks:
       - dev
+    env_file:
+      - ../.env

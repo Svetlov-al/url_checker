@@ -8,15 +8,15 @@ ENV = --env-file .env
 
 .PHONY: up
 up:
-	${DC} -f ${APP_DEV} -f ${POSTGRES} -f ${KAFKA} ${ENV} up -d --build --remove-orphans
+	${DC} -f ${APP_DEV} ${ENV} up -d --build --remove-orphans
 
 .PHONY: down
 down:
-	${DC} -f ${APP_DEV} -f ${POSTGRES} -f ${KAFKA} ${ENV} down --remove-orphans
+	${DC} -f ${APP_DEV} ${ENV} down --remove-orphans
 
 .PHONY: app-dev
 app-dev:
-	${DC} -f ${APP_DEV} -f ${KAFKA} ${ENV} up --build -d
+	${DC} -f ${APP_DEV} ${ENV} up --build -d
 
 .PHONY: app-dev-logs
 app-dev-logs:
@@ -36,7 +36,7 @@ down-dev:
 
 .PHONY: shell
 shell:
-	${DC} -f ${APP_DEV} -f ${KAFKA} ${ENV} exec -it ${APP_SERVICE} bash
+	${DC} -f ${APP_DEV} ${ENV} exec -it ${APP_SERVICE} bash
 
 .PHONY: upgrade
 upgrade:

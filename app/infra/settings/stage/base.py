@@ -20,9 +20,6 @@ class BaseAppSettings(BaseSettings):
 
     APP_ENV: AppEnvTypes = Field(default='prod', validation_alias="APP_ENV")
 
-    # BROKER
-    KAFKA_URL: str = Field(..., validation_alias="KAFKA_URL")
-
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
         env_file_encoding='utf-8',

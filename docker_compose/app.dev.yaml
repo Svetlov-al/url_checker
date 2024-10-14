@@ -2,6 +2,10 @@ networks:
   dev:
     driver: bridge
 
+include:
+  - postgres.yaml
+  - kafka.yaml
+
 services:
   main-app:
     container_name: app
@@ -19,13 +23,14 @@ services:
       - ../.env
 
     volumes:
-      - ../app/:/app/
-      - ../migrations/:/migrations/
+      - ../app:/src/app
     networks:
       - dev
 
     depends_on:
       kafka:
+        condition: service_healthy
+      db:
         condition: service_healthy
 
     command: "uvicorn --factory application.api.main:create_app --timeout-graceful-shutdown 2 --host ${API_HOST:?} --port ${API_PORT:?} --reload"

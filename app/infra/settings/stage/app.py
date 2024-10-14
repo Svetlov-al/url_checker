@@ -31,6 +31,11 @@ class AppSettings(BaseAppSettings):
     LOGGING_LEVEL: int = Field(20, validation_alias="LOGGING_LEVEL")
     FASTAPI_LOGGING_LEVEL: int = Field(50, validation_alias="FASTAPI_LOGGING_LEVEL")
 
+    # BROKER
+    KAFKA_URL: str = Field(..., validation_alias="KAFKA_URL")
+
+    VT_API_KEY: str = Field(..., validation_alias="VT_API_KEY")
+
     @property
     def fastapi_kwargs(self) -> dict[str, Any]:
         return {

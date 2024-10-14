@@ -19,7 +19,7 @@ class LinkModel(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # noqa: A003
     url: Mapped[str] = mapped_column(String, nullable=False)
-    virus_total: Mapped[bool] = mapped_column(Boolean, default=False)
+    virus_total: Mapped[bool] = mapped_column(Boolean, default=None, nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
 
