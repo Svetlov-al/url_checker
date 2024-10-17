@@ -16,6 +16,8 @@ SQLALCHEMY_DATABASE_URL = os.getenv("POSTGRES_URI", "").replace("+asyncpg", "")
 
 from app.adapters.orm.abusive_experience import AbusiveExperienceModel  # noqa
 from app.adapters.orm.base_link import LinkModel  # noqa
+from app.adapters.orm.credentials.abusive_experience_keys import AbusiveExperienceKeyModel  # noqa
+from app.adapters.orm.credentials.virus_total_keys import VirusTotalKeyModel  # noqa
 from app.adapters.orm.virus_total import VirusTotalModel  # noqa
 
 

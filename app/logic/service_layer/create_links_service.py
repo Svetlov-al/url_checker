@@ -1,17 +1,21 @@
 from dataclasses import dataclass
-from urllib.parse import urlparse
 
+import orjson
 from app.adapters.repositories.link_repository import AbstractLinkRepository
 from app.domain.entities.link_entity import LinkEntity
 from app.dtos.create_links_dto import CreateLinksDTO
+from app.infra.broker.base import BaseBroker
+from app.logic.service_layer.helpers.message import Message
+from app.logic.service_layer.helpers.normalize_url import normalize_url
 
 
 @dataclass
 class CreateLinksService:
     repo: AbstractLinkRepository
+    redis_broker: BaseBroker
 
     async def run(self, params: CreateLinksDTO) -> int:
-        normalized_links = [self.normalize_url(url) for url in params.links]
+        normalized_links = [normalize_url(url) for url in params.links]
 
         links = [LinkEntity(url=link) for link in normalized_links]
 
@@ -26,10 +30,14 @@ class CreateLinksService:
 
         created_links = await self.repo.create_many(new_links)
 
+        # => Подготавливаем сообщения для отправки в очереди
+        messages = await self.prepare_messages(created_links)
+
+        await self.redis_broker.publish_batch("virus_total", messages)
+        await self.redis_broker.publish_batch("abusive_exp", messages)
+
         return len(created_links)
 
     @staticmethod
-    def normalize_url(url: str) -> str:
-        parsed_url = urlparse(url)
-        domain = parsed_url.netloc or parsed_url.path
-        return domain.lower()
+    async def prepare_messages(messages: list[Message]) -> list[bytes]:
+        return [orjson.dumps({"id": str(link.id), "url": link.url}) for link in messages]

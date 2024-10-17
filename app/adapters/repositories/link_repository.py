@@ -4,6 +4,7 @@ from typing import AsyncContextManager
 
 from app.adapters.orm.base_link import LinkModel
 from app.domain.entities.link_entity import LinkEntity
+from app.logic.service_layer.helpers.message import Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -25,7 +26,7 @@ class AbstractLinkRepository(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def create_many(self, links: list[LinkEntity]) -> list[tuple[int, str]]:
+    async def create_many(self, links: list[LinkEntity]) -> list[Message]:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -84,7 +85,7 @@ class LinkRepository(AbstractLinkRepository):
 
             return [self._from_orm(link_model) for link_model in link_models]
 
-    async def create_many(self, links: list[LinkEntity]) -> list[tuple[int, str]]:
+    async def create_many(self, links: list[LinkEntity]) -> list[Message]:
         async with self.session_factory() as session:
             link_models: list[LinkModel] = [self._to_orm(link) for link in links]
 
@@ -92,7 +93,7 @@ class LinkRepository(AbstractLinkRepository):
 
             await session.commit()
 
-            return [(link_model.id, link_model.url) for link_model in link_models]
+            return [Message(id=link_model.id, url=link_model.url) for link_model in link_models]
 
     async def get_existing_links(self, urls: list[str]) -> list[LinkEntity]:
         async with self.session_factory() as session:

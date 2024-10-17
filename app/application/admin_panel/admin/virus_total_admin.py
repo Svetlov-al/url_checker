@@ -10,3 +10,7 @@ class VirusTotalModelAdmin(ModelView, model=VirusTotalModel):
         VirusTotalModel.created_at,
         VirusTotalModel.updated_at,
     )
+
+    is_async = True
+
+    name_plural = "Результаты VirusTotal"

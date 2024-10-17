@@ -9,3 +9,7 @@ class LinkModelAdmin(ModelView, model=LinkModel):
         LinkModel.created_at,
         LinkModel.updated_at,
     )
+
+    is_async = True
+
+    name_plural = "Базовые Ссылки"

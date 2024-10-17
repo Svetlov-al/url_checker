@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class Database:
 
     def __init__(self, db_url: str) -> None:
-        self._engine = create_async_engine(db_url, echo=True)
+        self._engine = create_async_engine(db_url, echo=False)
         self._async_session = async_sessionmaker(
             self._engine,
             expire_on_commit=False,

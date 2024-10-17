@@ -12,12 +12,12 @@ logger = logging.getLogger(__name__)
 class RedisMessageBroker(BaseBroker):
     redis: Redis
 
-    async def publish_message(self, queue_name: str, value: bytes):
+    async def publish_message(self, queue_name: str, message: bytes):
         try:
-            await self.redis.lpush(queue_name, value)
+            await self.redis.rpush(queue_name, message)
         except Exception as e:
             logger.error(
-                f"[Redis]: Ошибка при отправке сообщения:\n"
+                f"[Redis]: Ошибка при отправке сообщения {message}:\n"
                 f"Error: {e}",
             )
 
@@ -25,19 +25,22 @@ class RedisMessageBroker(BaseBroker):
         try:
             pipeline = self.redis.pipeline()
             for message in messages:
-                pipeline.lpush(queue_name, message)
+                pipeline.rpush(queue_name, message)
             await pipeline.execute()
         except Exception as e:
             logger.error(
-                f"[Redis]: Ошибка при отправке сообщений:\n"
+                f"[Redis]: Ошибка при отправке сообщений: {messages}\n"
                 f"Error: {e}",
             )
 
     async def read_messages(self, queue_name: str, count: int = 1) -> list[bytes]:
         """Читать сообщения из очереди с гарантией FIFO."""
         try:
-            messages = await self.redis.lpop(queue_name, count)
-            return messages
+            pipeline = self.redis.pipeline()
+            for _ in range(count):
+                pipeline.lpop(queue_name)
+            messages = await pipeline.execute()
+            return [msg for msg in messages if msg]
         except Exception as e:
             logger.error(
                 f"[Redis]: Ошибка при чтении сообщений:\n"

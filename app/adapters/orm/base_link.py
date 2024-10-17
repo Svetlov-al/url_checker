@@ -21,11 +21,13 @@ class LinkModel(Base, TimestampMixin):
         "AbusiveExperienceModel", back_populates="link",
         uselist=False,
         lazy='joined',
+        cascade="all, delete-orphan",
     )
     virus_total: Mapped["VirusTotalModel"] = relationship(  # noqa
         "VirusTotalModel", back_populates="link",
         uselist=False,
         lazy='joined',
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:

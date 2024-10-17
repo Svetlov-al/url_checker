@@ -10,3 +10,7 @@ class AbusiveExperienceModelAdmin(ModelView, model=AbusiveExperienceModel):
         AbusiveExperienceModel.created_at,
         AbusiveExperienceModel.updated_at,
     )
+
+    is_async = True
+
+    name_plural = "Результаты AbusiveExperience"
