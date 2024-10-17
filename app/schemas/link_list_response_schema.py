@@ -1,5 +1,5 @@
+from app.schemas.link_detail_schema import LinkDetailSchema
 from pydantic import BaseModel
-from schemas.link_detail_schema import LinkDetailSchema
 
 
 class LinksResponseSchema(BaseModel):

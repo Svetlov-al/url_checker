@@ -1,8 +1,7 @@
 from typing import Any
 
+from app.infra.settings.stage.base import BaseAppSettings
 from pydantic import Field
-
-from infra.settings.stage.base import BaseAppSettings
 
 
 class AppSettings(BaseAppSettings):
@@ -32,9 +31,8 @@ class AppSettings(BaseAppSettings):
     FASTAPI_LOGGING_LEVEL: int = Field(50, validation_alias="FASTAPI_LOGGING_LEVEL")
 
     # BROKER
-    KAFKA_URL: str = Field(..., validation_alias="KAFKA_URL")
-
-    VT_API_KEY: str = Field(..., validation_alias="VT_API_KEY")
+    REDIS_HOST: str = Field("localhost", validation_alias="REDIS_HOST")
+    REDIS_PORT: int = Field(6379, validation_alias="REDIS_PORT")
 
     @property
     def fastapi_kwargs(self) -> dict[str, Any]:

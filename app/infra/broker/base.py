@@ -6,33 +6,16 @@ from dataclasses import dataclass
 
 
 @dataclass
-class BaseProducer(ABC):
+class BaseBroker(ABC):
+
     @abstractmethod
-    async def start(self):
+    async def publish_message(self, queue_name: str, value: bytes) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    async def close(self):
+    async def publish_batch(self, queue_name: str, messages: list[bytes]) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    async def publish_message(self, key: str, topic: str, value: bytes) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def publish_batch(self, topic: str, key: bytes, messages: list[bytes]) -> None:
-        raise NotImplementedError
-
-
-class BaseConsumer(ABC):
-    @abstractmethod
-    async def start(self):
-        raise NotImplementedError
-
-    @abstractmethod
-    async def close(self):
-        raise NotImplementedError
-
-    @abstractmethod
-    async def start_consuming(self, topic: str, batch_size: int, max_attempts: int) -> list:
+    async def read_messages(self, queue_name: str, count: int = 1) -> list[dict]:
         raise NotImplementedError

@@ -5,18 +5,17 @@ from fastapi import (
 )
 from fastapi.routing import APIRouter
 
+from app.domain.exceptions.base import ApplicationException
+from app.dtos.create_links_dto import CreateLinksDTO
+from app.infra.ioc.container.application import AppContainer
+from app.logic.service_layer.create_links_service import CreateLinksService
+from app.schemas.base import ErrorSchema
+from app.schemas.create_links_request_schema import CreateUrlRequestSchema
+from app.schemas.create_links_response_schema import CreateLinksResponseSchema
 from dependency_injector.wiring import (
     inject,
     Provide,
 )
-from dtos.create_links_dto import CreateLinksDTO
-from schemas.base import ErrorSchema
-from schemas.create_links_request_schema import CreateUrlRequestSchema
-from schemas.create_links_response_schema import CreateLinksResponseSchema
-
-from domain.exceptions.base import ApplicationException
-from infra.ioc.container.application import AppContainer
-from logic.service_layer.create_links_service import CreateLinksService
 
 
 router = APIRouter(tags=["URL's"])

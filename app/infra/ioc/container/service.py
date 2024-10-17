@@ -1,14 +1,13 @@
+from app.infra.ioc.container.core import CoreContainer
+from app.infra.ioc.container.infrastructure import InfrastructureContainer
+from app.logic.service_layer.create_links_service import CreateLinksService
+from app.logic.service_layer.get_link_by_title_service import GetLinksByDomainListService
+from app.logic.service_layer.get_links_serivce import GetLinksService
 from dependency_injector import (
     containers,
     providers,
 )
 from dependency_injector.providers import Factory
-
-from infra.ioc.container.core import CoreContainer
-from infra.ioc.container.infrastructure import InfrastructureContainer
-from logic.service_layer.create_links_service import CreateLinksService
-from logic.service_layer.get_good_links_serivce import GetGoodLinksService
-from logic.service_layer.get_link_by_title_service import GetLinkByTitleService
 
 
 class ServicesContainer(containers.DeclarativeContainer):
@@ -19,15 +18,14 @@ class ServicesContainer(containers.DeclarativeContainer):
     create_links_service: Factory[CreateLinksService] = providers.Factory(
         CreateLinksService,
         repo=infrastructure.link_repo.provided,
-        kafka_producer=core.kafka_producer.provided,
     )
 
-    get_good_links_service: Factory[GetGoodLinksService] = providers.Factory(
-        GetGoodLinksService,
+    get_links_service: Factory[GetLinksService] = providers.Factory(
+        GetLinksService,
         repo=infrastructure.link_repo.provided,
     )
 
-    get_link_by_title_service: Factory[GetLinkByTitleService] = providers.Factory(
-        GetLinkByTitleService,
+    get_links_by_domain_list_service: Factory[GetLinksByDomainListService] = providers.Factory(
+        GetLinksByDomainListService,
         repo=infrastructure.link_repo.provided,
     )

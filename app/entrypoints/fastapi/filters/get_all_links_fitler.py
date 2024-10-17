@@ -1,6 +1,5 @@
+from app.infra.filters.get_all_links_infra_filters import GetAllLinksInfraFilters
 from pydantic import BaseModel
-
-from infra.filters.get_all_links_infra_filters import GetAllLinksInfraFilters
 
 
 class GetAllLinksFilters(BaseModel):

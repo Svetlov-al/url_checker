@@ -1,32 +1,27 @@
+from app.database.settings.development import Database
+from app.infra.broker.base import BaseBroker
+from app.infra.broker.redis_broker import RedisMessageBroker
+from app.infra.settings.config import get_app_settings
+from app.infra.settings.redis_connection import init_redis_pool
+from app.infra.settings.stage.app import AppSettings
 from dependency_injector import (
     containers,
     providers,
 )
 from dependency_injector.providers import Factory
-
-from infra.broker.base import (
-    BaseConsumer,
-    BaseProducer,
-)
-from infra.database import Database
-from infra.settings.config import get_app_settings
-from infra.settings.kafka_broker import (
-    create_message_consumer,
-    create_message_producer,
-)
-from infra.settings.stage.app import AppSettings
+from redis.asyncio import Redis
 
 
 class CoreContainer(containers.DeclarativeContainer):
     settings: Factory[AppSettings] = providers.Callable(get_app_settings)
     db: Factory[Database] = providers.Singleton(Database, db_url=settings().POSTGRES_URI)
 
-    kafka_producer: providers.Factory[BaseProducer] = providers.Factory(
-        create_message_producer,
-        kafka_url=settings().KAFKA_URL,
+    redis_pool: Factory[Redis] = providers.Resource(
+        init_redis_pool,
+        host=settings().REDIS_HOST,
+        port=settings().REDIS_PORT,
     )
-
-    kafka_consumer: Factory[BaseConsumer] = providers.Factory(
-        create_message_consumer,
-        kafka_url=settings().KAFKA_URL,
+    redis_broker: providers.Factory[BaseBroker] = providers.Factory(
+        RedisMessageBroker,
+        redis=redis_pool,
     )

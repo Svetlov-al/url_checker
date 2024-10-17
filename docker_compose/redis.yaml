@@ -1,0 +1,27 @@
+networks:
+  dev:
+    driver: bridge
+
+services:
+  redis:
+    image: "redis:alpine"
+    restart: always
+    container_name: redis
+    expose:
+      - ${REDIS_PORT:?}
+    env_file:
+      - ../.env
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli ping | grep PONG" ]
+      interval: 10s
+      timeout: 30s
+      retries: 5
+      start_period: 80s
+    networks:
+      - dev
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
+    name: redis_data

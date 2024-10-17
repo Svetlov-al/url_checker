@@ -4,11 +4,9 @@ from abc import (
 )
 from dataclasses import dataclass
 
-from aiokafka import ConsumerRecord
-
 
 @dataclass
 class IMessageProcessor(ABC):
     @abstractmethod
-    async def process_batch(self, api_key: str, messages: list[ConsumerRecord]) -> dict[int, bool]:
+    async def process_batch(self, api_key: str, messages: list[str]) -> dict[int, bool]:
         raise NotImplementedError

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
 
 
-class GetLinkRequestSchema(BaseModel):
-    url: str
+class GetLinksRequestSchema(BaseModel):
+    urls: list[str]

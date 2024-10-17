@@ -1,13 +1,14 @@
-import entrypoints
-import schemas
+from app import (
+    entrypoints,
+    schemas,
+)
+from app.infra.ioc.container.core import CoreContainer
+from app.infra.ioc.container.infrastructure import InfrastructureContainer
+from app.infra.ioc.container.service import ServicesContainer
 from dependency_injector import (
     containers,
     providers,
 )
-
-from infra.ioc.container.core import CoreContainer
-from infra.ioc.container.infrastructure import InfrastructureContainer
-from infra.ioc.container.service import ServicesContainer
 
 
 class AppContainer(containers.DeclarativeContainer):

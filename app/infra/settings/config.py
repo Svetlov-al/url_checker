@@ -1,10 +1,10 @@
-from infra.settings.stage.app import AppSettings
-from infra.settings.stage.base import (
+from app.infra.settings.stage.app import AppSettings
+from app.infra.settings.stage.base import (
     AppEnvTypes,
     BaseAppSettings,
 )
-from infra.settings.stage.dev import DevAppSettings
-from infra.settings.stage.prod import ProdAppSettings
+from app.infra.settings.stage.dev import DevAppSettings
+from app.infra.settings.stage.prod import ProdAppSettings
 
 
 environments: dict[AppEnvTypes, type[AppSettings]] = {

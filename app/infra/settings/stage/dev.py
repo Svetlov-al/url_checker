@@ -1,4 +1,4 @@
-from infra.settings.stage.app import AppSettings
+from app.infra.settings.stage.app import AppSettings
 
 
 class DevAppSettings(AppSettings):

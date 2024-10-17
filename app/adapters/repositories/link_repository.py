@@ -2,14 +2,14 @@ import abc
 from collections.abc import Callable
 from typing import AsyncContextManager
 
-from adapters.orm import LinkModel
+from app.adapters.orm.base_link import LinkModel
+from app.domain.entities.link_entity import LinkEntity
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from domain.entities.link_entity import LinkEntity
 
-
-class AbstractRepository(abc.ABC):
+class AbstractLinkRepository(abc.ABC):
     __model = None
 
     @abc.abstractmethod
@@ -21,19 +21,19 @@ class AbstractRepository(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def get_list(self, limit: int, offset: int, virus_total: bool) -> list[LinkEntity]:
+    async def get_list(self, limit: int, offset: int) -> list[LinkEntity]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def create_many(self, links: list[LinkEntity]) -> list[LinkEntity]:
+    async def create_many(self, links: list[LinkEntity]) -> list[tuple[int, str]]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def get_existing_links(self, urls: list[str]) -> list[str]:
+    async def get_existing_links(self, urls: list[str]) -> list[LinkEntity]:
         raise NotImplementedError
 
 
-class LinkRepository(AbstractRepository):
+class LinkRepository(AbstractLinkRepository):
     __model = LinkModel
 
     def __init__(self, session_factory: Callable[..., AsyncContextManager[AsyncSession]]) -> None:
@@ -41,7 +41,7 @@ class LinkRepository(AbstractRepository):
 
     async def add(self, link: LinkEntity) -> None:
         async with self.session_factory() as session:
-            session.add(link.to_domain())
+            session.add(self._to_orm(link))
             await session.commit()
 
     async def get(self, url: str) -> LinkEntity | None:
@@ -50,6 +50,10 @@ class LinkRepository(AbstractRepository):
                 (
                     await session.execute(
                         select(self.__model)
+                        .options(
+                            selectinload(self.__model.virus_total),
+                            selectinload(self.__model.abusive_experience),
+                        )
                         .filter_by(
                             url=url,
                         ),
@@ -63,23 +67,24 @@ class LinkRepository(AbstractRepository):
 
             return self._from_orm(link_model)
 
-    async def get_list(self, limit: int, offset: int, virus_total: bool) -> list[LinkEntity]:
+    async def get_list(self, limit: int, offset: int) -> list[LinkEntity]:
         async with self.session_factory() as session:
             link_models = (
-                (
-                    await session.execute(
-                        select(self.__model)
-                        .filter_by(virus_total=virus_total)
-                        .limit(limit)
-                        .offset(offset),
+                await session.execute(
+                    select(self.__model)
+                    .options(
+                        selectinload(self.__model.virus_total),
+                        selectinload(self.__model.abusive_experience),
                     )
+                    .limit(limit)
+                    .offset(offset),
                 )
-                .scalars()
-                .all()
             )
+            link_models = link_models.scalars().all()
+
             return [self._from_orm(link_model) for link_model in link_models]
 
-    async def create_many(self, links: list[LinkEntity]) -> list[LinkEntity]:
+    async def create_many(self, links: list[LinkEntity]) -> list[tuple[int, str]]:
         async with self.session_factory() as session:
             link_models: list[LinkModel] = [self._to_orm(link) for link in links]
 
@@ -87,24 +92,27 @@ class LinkRepository(AbstractRepository):
 
             await session.commit()
 
-            return [self._from_orm(link_model) for link_model in link_models]
+            return [(link_model.id, link_model.url) for link_model in link_models]
 
-    async def get_existing_links(self, urls: list[str]) -> list[str]:
+    async def get_existing_links(self, urls: list[str]) -> list[LinkEntity]:
         async with self.session_factory() as session:
             link_models = (
                 await session.execute(
-                    select(self.__model.url)
+                    select(self.__model)
+                    .options(
+                        selectinload(self.__model.virus_total),
+                        selectinload(self.__model.abusive_experience),
+                    )
                     .filter(self.__model.url.in_(urls)),
                 )
             )
-            return list(link_models.scalars().all())
+            return [self._from_orm(link) for link in link_models.scalars().all()]
 
     @staticmethod
     def _to_orm(link_entity: LinkEntity) -> LinkModel:
         """Преобразует доменную сущность в ORM модель."""
         return LinkModel(
             url=link_entity.url,
-            virus_total=link_entity.virus_total,
         )
 
     @staticmethod
@@ -113,6 +121,12 @@ class LinkRepository(AbstractRepository):
         return LinkEntity(
             id=link_model.id,
             url=link_model.url,
-            virus_total=link_model.virus_total,
+            virus_total=(
+                link_model.virus_total.result if link_model.virus_total else None
+            ),
+            abusive_exp=(
+                link_model.abusive_experience.result if link_model.abusive_experience else None
+            ),
+            created_at=link_model.created_at,
             updated_at=link_model.updated_at,
         )

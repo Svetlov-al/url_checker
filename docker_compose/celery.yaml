@@ -2,14 +2,10 @@ networks:
   dev:
     driver: bridge
 
-services:
-  redis:
-    image: redis
-    ports:
-      - "6379:6379"
-    networks:
-      - dev
+include:
+  - redis.yaml
 
+services:
   celery_worker:
     container_name: celery_worker
     build: ..
@@ -17,7 +13,8 @@ services:
     volumes:
       - ../app:/src/app
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     networks:
       - dev
     env_file:

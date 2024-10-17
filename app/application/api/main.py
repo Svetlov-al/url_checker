@@ -2,17 +2,18 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from entrypoints.fastapi.endpoints.create_links import router as create_links_router
-from entrypoints.fastapi.endpoints.get_good_links import router as get_good_links_router
-from entrypoints.fastapi.endpoints.get_link_by_title import router as get_link_by_title_router
-
-from infra.ioc.container.application import AppContainer
-from infra.settings.stage.app import AppSettings
+from app.application.admin_panel.admin.base_admin import create_admin
+from app.database.settings.development import Database
+from app.entrypoints.fastapi.endpoints.create_links import router as create_links_router
+from app.entrypoints.fastapi.endpoints.get_links import router as get_links_router
+from app.entrypoints.fastapi.endpoints.get_links_by_domain_list import router as get_links_by_domain_list_router
+from app.infra.ioc.container.application import AppContainer
+from app.infra.settings.stage.app import AppSettings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db = app.container.core.container.db.provided()  # noqa
+    db: Database = app.container.core.db.provided()  # noqa
     await db.create_database()
     yield
 
@@ -28,7 +29,9 @@ def create_app() -> FastAPI:
 
     app.container = container
     app.include_router(create_links_router, prefix='/urls')
-    app.include_router(get_good_links_router, prefix='/urls')
-    app.include_router(get_link_by_title_router, prefix='/urls')
+    app.include_router(get_links_router, prefix='/urls')
+    app.include_router(get_links_by_domain_list_router, prefix='/urls')
+
+    create_admin(app)
 
     return app

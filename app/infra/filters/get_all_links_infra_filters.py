@@ -5,4 +5,3 @@ from dataclasses import dataclass
 class GetAllLinksInfraFilters:
     limit: int
     offset: int
-    virus_total: bool = False

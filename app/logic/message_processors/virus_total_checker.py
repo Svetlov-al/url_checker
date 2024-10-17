@@ -4,9 +4,7 @@ import logging
 from dataclasses import dataclass
 
 import httpx
-from aiokafka import ConsumerRecord
-
-from logic.message_processor.base import IMessageProcessor
+from app.logic.message_processors.base import IMessageProcessor
 
 
 logger = logging.getLogger(__name__)
@@ -18,7 +16,7 @@ class VirusTotalChecker(IMessageProcessor):
     async def process_batch(
         self,
         api_key: str,
-        messages: list[ConsumerRecord],
+        messages,
     ) -> dict[str, bool]:
         results = {}
 

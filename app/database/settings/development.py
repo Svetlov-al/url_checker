@@ -2,27 +2,25 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncContextManager
 
+from app.database.settings.base import Base
 from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
-    AsyncAttrs,
     AsyncSession,
     create_async_engine,
 )
-from sqlalchemy.orm import DeclarativeBase
 
 
 logger = logging.getLogger(__name__)
-
-
-class Base(AsyncAttrs, DeclarativeBase):
-    pass
 
 
 class Database:
 
     def __init__(self, db_url: str) -> None:
         self._engine = create_async_engine(db_url, echo=True)
-        self._async_session = async_sessionmaker(self._engine, expire_on_commit=False)
+        self._async_session = async_sessionmaker(
+            self._engine,
+            expire_on_commit=False,
+        )
 
     async def create_database(self) -> None:
         async with self._engine.begin() as conn:

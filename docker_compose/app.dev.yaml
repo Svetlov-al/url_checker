@@ -4,7 +4,7 @@ networks:
 
 include:
   - postgres.yaml
-  - kafka.yaml
+  - redis.yaml
 
 services:
   main-app:
@@ -23,14 +23,14 @@ services:
       - ../.env
 
     volumes:
-      - ../app:/src/app
+      - ..:/app
     networks:
       - dev
 
     depends_on:
-      kafka:
+      redis:
         condition: service_healthy
       db:
         condition: service_healthy
 
-    command: "uvicorn --factory application.api.main:create_app --timeout-graceful-shutdown 2 --host ${API_HOST:?} --port ${API_PORT:?} --reload"
+    command: "uvicorn --factory app.application.api.main:create_app --timeout-graceful-shutdown 2 --host ${API_HOST:?} --port ${API_PORT:?} --reload"

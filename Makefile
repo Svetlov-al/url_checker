@@ -1,6 +1,6 @@
 DC = docker compose
 APP_DEV = docker_compose/app.dev.yaml
-KAFKA = docker_compose/kafka.yaml
+REDIS = docker_compose/redis.yaml
 POSTGRES = docker_compose/postgres.yaml
 APP_SERVICE = main-app
 CELERY = docker_compose/celery.yaml
@@ -40,8 +40,11 @@ shell:
 
 .PHONY: upgrade
 upgrade:
-	${DC} -f ${APP_DEV} ${ENV} exec -it ${APP_SERVICE} bash -c "cd / && alembic upgrade head"
+	${DC} -f ${APP_DEV} ${ENV} exec -it ${APP_SERVICE} bash -c "alembic upgrade head"
 
+.PHONY: downgrade
+downgrade:
+	${DC} -f ${APP_DEV} ${ENV} exec -it ${APP_SERVICE} bash -c "alembic downgrade -1"
 
 .PHONY: celery
 celery:
