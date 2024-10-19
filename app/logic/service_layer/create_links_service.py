@@ -40,4 +40,4 @@ class CreateLinksService:
 
     @staticmethod
     async def prepare_messages(messages: list[Message]) -> list[bytes]:
-        return [orjson.dumps({"id": str(link.id), "url": link.url}) for link in messages]
+        return [orjson.dumps({str(link.id): link.url}) for link in messages]

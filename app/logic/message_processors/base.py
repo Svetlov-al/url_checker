@@ -4,9 +4,15 @@ from abc import (
 )
 from dataclasses import dataclass
 
+import httpx
+
 
 @dataclass
 class IMessageProcessor(ABC):
     @abstractmethod
-    async def process_batch(self, api_key: str, messages: list[str]) -> dict[int, bool]:
+    async def process_batch(self, messages: list[bytes]) -> dict[int, bool]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def _process_message(self, client: httpx.AsyncClient, message: bytes, results: dict) -> None:
         raise NotImplementedError

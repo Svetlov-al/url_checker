@@ -17,6 +17,8 @@ class AbusiveExperienceKeyModel(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # noqa: A003
     api_key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     is_valid: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    daily_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=500)
+    used_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     def __str__(self) -> str:
         return f"ID: {self.id}, Token: {self.api_key}, Valid: {self.is_valid}"

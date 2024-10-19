@@ -9,6 +9,8 @@ class VirusTotalKeyModelAdmin(ModelView, model=VirusTotalKeyModel):
         VirusTotalKeyModel.is_valid,
         VirusTotalKeyModel.created_at,
         VirusTotalKeyModel.updated_at,
+        VirusTotalKeyModel.daily_limit,
+        VirusTotalKeyModel.used_limit,
     )
 
     is_async = True

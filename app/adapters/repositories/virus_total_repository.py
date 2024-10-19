@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class AbstractVirusTotalRepository(abc.ABC):
-    __model = None
+    def __init__(self, session_factory: Callable[..., AsyncContextManager[AsyncSession]]):
+        self.session_factory = session_factory
 
     @abc.abstractmethod
     async def add(self, result: VirusTotalEntity) -> None:
@@ -26,10 +27,9 @@ class AbstractVirusTotalRepository(abc.ABC):
 
 
 class VirusTotalRepository(AbstractVirusTotalRepository):
-    __model = VirusTotalModel
-
     def __init__(self, session_factory: Callable[..., AsyncContextManager[AsyncSession]]) -> None:
-        self.session_factory = session_factory
+        super().__init__(session_factory)
+        self.__model = VirusTotalModel
 
     async def add(self, result: VirusTotalEntity) -> None:
         async with self.session_factory() as session:
@@ -100,6 +100,5 @@ class VirusTotalRepository(AbstractVirusTotalRepository):
         """Преобразует ORM модель в доменную сущность."""
         return VirusTotalEntity(
             link_id=result_model.link_id,
-            url=result_model.link.url,
             result=result_model.result,
         )

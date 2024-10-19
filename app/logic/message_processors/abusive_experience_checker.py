@@ -1,7 +1,7 @@
-import base64
+import asyncio
 import json
 import logging
-from dataclasses import dataclass
+from asyncio import Semaphore
 
 import httpx
 from app.logic.message_processors.base import IMessageProcessor
@@ -10,44 +10,67 @@ from app.logic.message_processors.base import IMessageProcessor
 logger = logging.getLogger(__name__)
 
 
-@dataclass
 class AbusiveExperienceChecker(IMessageProcessor):
+    def __init__(self, api_key: str, client_id: str, max_concurrent_requests: int = 10):
+        self.semaphore: Semaphore = Semaphore(max_concurrent_requests)
+        self.api_key: str = api_key
+        self.client_id: str = client_id
 
     async def process_batch(
         self,
-        api_key: str,
-        messages,
+        messages: list[bytes],
     ) -> dict[str, bool]:
         results = {}
 
         async with httpx.AsyncClient() as client:
+            tasks = []
             for m in messages:
-                try:
-                    message_data = json.loads(m.value)
-                    for Id, link in message_data.items():
-                        encoded_url = base64.urlsafe_b64encode(link.encode()).decode().rstrip("=")
-                        response = await client.get(
-                            f'https://www.virustotal.com/api/v3/urls/{encoded_url}',
-                            headers={
-                                "accept": "application/json",
-                                "x-apikey": api_key,
-                            },
-                        )
-                        if response.status_code == 200:
-                            data = response.json()
-                            is_malicious = data['data']['attributes']['last_analysis_stats']['malicious'] > 0
-                            results[str(Id)] = is_malicious
-                        else:
-                            results[str(Id)] = None
-                except json.JSONDecodeError:
-                    logger.error(
-                        f"[VirusTotal]: Ошибка декодирования сообщения:\n"
-                        f"Сообщение: {m.value}",
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"[VirusTotal]: Неизвестная ошибка обработки сообщения:\n"
-                        f"Error: {e}",
-                    )
+                tasks.append(self._process_message(client, m, results))
+            await asyncio.gather(*tasks)
 
         return results
+
+    async def _process_message(self, client: httpx.AsyncClient, message: bytes, results: dict[str, bool | None]):
+        async with self.semaphore:
+            try:
+                message_data = json.loads(message)
+                for Id, link in message_data.items():
+                    response = await client.post(
+                        'https://safebrowsing.googleapis.com/v4/threatMatches:find',
+                        headers={
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "client": {
+                                "clientId": self.client_id,
+                                "clientVersion": "1.5.2",
+                            },
+                            "threatInfo": {
+                                "threatTypes": ["MALWARE", "SOCIAL_ENGINEERING"],
+                                "platformTypes": ["ANY_PLATFORM"],
+                                "threatEntryTypes": ["URL"],
+                                "threatEntries": [
+                                    {"url": link},
+                                ],
+                            },
+                        },
+                        params={
+                            "key": self.api_key,
+                        },
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        is_abusive = "matches" in data and len(data["matches"]) > 0
+                        results[str(Id)] = is_abusive
+                    else:
+                        results[str(Id)] = None
+            except json.JSONDecodeError:
+                logger.error(
+                    f"[AbusiveExperience]: Ошибка декодирования сообщения:\n"
+                    f"Сообщение: {message}",
+                )
+            except Exception as e:
+                logger.error(
+                    f"[AbusiveExperience]: Неизвестная ошибка обработки сообщения:\n"
+                    f"Error: {e}",
+                )

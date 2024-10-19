@@ -17,5 +17,5 @@ class BaseBroker(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def read_messages(self, queue_name: str, count: int = 1) -> list[dict]:
+    async def read_messages(self, queue_name: str, count: int = 1) -> list[bytes]:
         raise NotImplementedError

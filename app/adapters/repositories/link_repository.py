@@ -11,7 +11,8 @@ from sqlalchemy.orm import selectinload
 
 
 class AbstractLinkRepository(abc.ABC):
-    __model = None
+    def __init__(self, session_factory: Callable[..., AsyncContextManager[AsyncSession]]):
+        self.session_factory = session_factory
 
     @abc.abstractmethod
     async def add(self, link: LinkEntity) -> None:
@@ -35,10 +36,9 @@ class AbstractLinkRepository(abc.ABC):
 
 
 class LinkRepository(AbstractLinkRepository):
-    __model = LinkModel
-
     def __init__(self, session_factory: Callable[..., AsyncContextManager[AsyncSession]]) -> None:
-        self.session_factory = session_factory
+        super().__init__(session_factory)
+        self.__model = LinkModel
 
     async def add(self, link: LinkEntity) -> None:
         async with self.session_factory() as session:

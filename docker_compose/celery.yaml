@@ -9,7 +9,7 @@ services:
   celery_worker:
     container_name: celery_worker
     build: ..
-    command: celery -A infra.celery_worker worker --pool=solo --loglevel=info
+    command: celery -A app.infra.celery_worker worker --pool=solo --loglevel=info
     volumes:
       - ../app:/src/app
     depends_on:
@@ -23,7 +23,7 @@ services:
   flower:
     container_name: flower
     build: ..
-    command: celery -A infra.celery_worker flower --port=5555
+    command: celery -A app.infra.celery_worker flower --port=5555
     ports:
       - "5555:5555"
     depends_on:

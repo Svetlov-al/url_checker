@@ -2,6 +2,10 @@ from app.adapters.repositories.abusive_experience_repository import (
     AbstractAbusiveExperienceRepository,
     AbusiveExperienceRepository,
 )
+from app.adapters.repositories.api_keys_repository import (
+    AbstractAPIKeyRepository,
+    APIKeyRepository,
+)
 from app.adapters.repositories.link_repository import (
     AbstractLinkRepository,
     LinkRepository,
@@ -31,6 +35,7 @@ class InfrastructureContainer(containers.DeclarativeContainer):
         LinkRepository,
         session_factory=core.db.provided.session,
     )
+
     vt_repo: Factory[AbstractVirusTotalRepository] = providers.Factory(
         VirusTotalRepository,
         session_factory=core.db.provided.session,
@@ -41,6 +46,10 @@ class InfrastructureContainer(containers.DeclarativeContainer):
         session_factory=core.db.provided.session,
     )
 
+    api_key_repo: Factory[AbstractAPIKeyRepository] = providers.Factory(
+        APIKeyRepository,
+        session_factory=core.db.provided.session,
+    )
     vt_message_processor: Factory[IMessageProcessor] = providers.Factory(
         VirusTotalChecker,
     )

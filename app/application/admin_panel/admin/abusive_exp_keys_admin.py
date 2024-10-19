@@ -9,6 +9,8 @@ class AbusiveExperienceKeyModelAdmin(ModelView, model=AbusiveExperienceKeyModel)
         AbusiveExperienceKeyModel.is_valid,
         AbusiveExperienceKeyModel.created_at,
         AbusiveExperienceKeyModel.updated_at,
+        AbusiveExperienceKeyModel.daily_limit,
+        AbusiveExperienceKeyModel.used_limit,
     )
 
     is_async = True
