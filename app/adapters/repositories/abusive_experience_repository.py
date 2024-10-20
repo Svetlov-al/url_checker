@@ -1,4 +1,5 @@
 import abc
+import logging
 from collections.abc import Callable
 from typing import AsyncContextManager
 
@@ -6,6 +7,7 @@ from app.adapters.orm.abusive_experience import AbusiveExperienceModel
 from app.domain.entities.abusive_experience_entity import AbusiveExperienceEntity
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -28,6 +30,9 @@ class AbstractAbusiveExperienceRepository(abc.ABC):
     @abc.abstractmethod
     async def create_many(self, results: list[AbusiveExperienceEntity]) -> list[AbusiveExperienceEntity]:
         raise NotImplementedError
+
+
+logger = logging.getLogger(__name__)
 
 
 class AbusiveExperienceRepository(AbstractAbusiveExperienceRepository):
@@ -85,7 +90,12 @@ class AbusiveExperienceRepository(AbstractAbusiveExperienceRepository):
                     index_elements=['link_id'],
                     set_={'result': result_model.result},
                 )
-                await session.execute(stmt)
+                try:
+                    await session.execute(stmt)
+                except IntegrityError as e:
+                    logger.error(
+                        f"[AbusiveExperienceModel]: Ошибка при вставке для link_id {result_model.link_id}: {e.orig}",
+                    )
 
             await session.commit()
 

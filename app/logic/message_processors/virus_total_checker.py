@@ -46,7 +46,7 @@ class VirusTotalChecker(IMessageProcessor):
                 message_data = json.loads(message)
                 for Id, link in message_data.items():
                     encoded_url = base64.urlsafe_b64encode(link.encode()).decode().rstrip("=")
-
+                    # => Загрузка ключей с лимитами
                     keys_with_limits = await self.api_key_repo.load_keys_from_db()
                     available_keys = [key for key, limit in keys_with_limits.items() if limit > 0]
 
@@ -54,6 +54,7 @@ class VirusTotalChecker(IMessageProcessor):
                         api_key = available_keys.pop(0)
                         logger.info(f"Обработка сообщения c ID: {Id}, url: {link}")
 
+                        # => Отправляем запрос к API "Virus Total"
                         response = await client.get(
                             f'https://www.virustotal.com/api/v3/urls/{encoded_url}',
                             headers={

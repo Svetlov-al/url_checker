@@ -1,4 +1,5 @@
 import abc
+import logging
 from collections.abc import Callable
 from typing import AsyncContextManager
 
@@ -6,6 +7,7 @@ from app.adapters.orm.virus_total import VirusTotalModel
 from app.domain.entities.virus_total_entity import VirusTotalEntity
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -24,6 +26,9 @@ class AbstractVirusTotalRepository(abc.ABC):
     @abc.abstractmethod
     async def create_many(self, results: list[VirusTotalEntity]) -> list[VirusTotalEntity]:
         raise NotImplementedError
+
+
+logger = logging.getLogger(__name__)
 
 
 class VirusTotalRepository(AbstractVirusTotalRepository):
@@ -81,7 +86,12 @@ class VirusTotalRepository(AbstractVirusTotalRepository):
                     index_elements=['link_id'],
                     set_={'result': result_model.result},
                 )
-                await session.execute(stmt)
+                try:
+                    await session.execute(stmt)
+                except IntegrityError as e:
+                    logger.error(
+                        f"[VirusTotalModel]: Ошибка при вставке для link_id {result_model.link_id}: {e.orig}",
+                    )
 
             await session.commit()
 
