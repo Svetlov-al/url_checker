@@ -3,7 +3,7 @@ networks:
     driver: bridge
 
 include:
-  - postgres.yaml
+  - mariadb.yaml
   - redis.yaml
 
 services:
@@ -12,9 +12,6 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-
-    environment:
-      KAFKA_URL: ${KAFKA_URL:?}
 
     ports:
       - ${API_PORT:?}:8000

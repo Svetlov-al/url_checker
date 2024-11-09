@@ -15,16 +15,10 @@ class LinkModel(Base, TimestampMixin):
     __tablename__ = "link"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # noqa: A003
-    url: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    url: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
 
-    abusive_experience: Mapped["AbusiveExperienceModel"] = relationship(  # noqa
-        "AbusiveExperienceModel", back_populates="link",
-        uselist=False,
-        lazy='joined',
-        cascade="all, delete-orphan",
-    )
-    virus_total: Mapped["VirusTotalModel"] = relationship(  # noqa
-        "VirusTotalModel", back_populates="link",
+    result: Mapped["ResultModel"] = relationship(  # noqa
+        "ResultModel", back_populates="link",
         uselist=False,
         lazy='joined',
         cascade="all, delete-orphan",

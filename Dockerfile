@@ -1,5 +1,5 @@
 # Stage 1: Builder
-FROM python:3.12.1-slim-bullseye AS builder
+FROM python:3.11.5-slim-bullseye AS builder
 
 # Копируем файлы для установки зависимостей
 COPY poetry.lock pyproject.toml ./
@@ -9,7 +9,7 @@ RUN python -m pip install poetry==1.8.2 && \
     poetry export --format requirements.txt --without-hashes -o requirements.txt
 
 # Stage 2: Development
-FROM python:3.12.1-slim-bullseye AS dev
+FROM python:3.11.5-slim-bullseye AS dev
 
 # Переменные окружения
 ENV PYTHONFAULTHANDLER=1 \

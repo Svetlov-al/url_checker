@@ -12,21 +12,23 @@ from sqlalchemy.orm import (
 )
 
 
-class AbusiveExperienceModel(Base, TimestampMixin):
-    __tablename__ = "abusive_experience"
+class ResultModel(Base, TimestampMixin):
+    __tablename__ = "result"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # noqa: A003
-    result: Mapped[bool] = mapped_column(Boolean, nullable=True)
+
+    virus_total: Mapped[bool] = mapped_column(Boolean, nullable=True)
+    abusive_experience: Mapped[bool] = mapped_column(Boolean, nullable=True)
 
     link_id: Mapped[int] = mapped_column(Integer, ForeignKey("link.id", ondelete="CASCADE"), unique=True)
-    link: Mapped["LinkModel"] = relationship("LinkModel", back_populates="abusive_experience")  # noqa
+    link: Mapped["LinkModel"] = relationship("LinkModel", back_populates="result")  # noqa
 
     def __repr__(self) -> str:
         return (
-            f"<AbusiveExperienceModel(id={self.id}, result={self.result}, link_id={self.link_id})>"
+            f"<ResultModel(id={self.id}, link_id={self.link_id})>"
         )
 
     def __str__(self) -> str:
         return (
-            f"LinkID: {self.id}, Result: {self.result}"
+            f"LinkID: {self.id}"
         )

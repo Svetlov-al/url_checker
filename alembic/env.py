@@ -12,13 +12,13 @@ from sqlalchemy import (
 
 load_dotenv()
 
-SQLALCHEMY_DATABASE_URL = os.getenv("POSTGRES_URI", "").replace("+asyncpg", "")
+sync_database_url = os.getenv("SYNC_SQLALCHEMY_DATABASE_URL")
 
-from app.adapters.orm.abusive_experience import AbusiveExperienceModel  # noqa
 from app.adapters.orm.base_link import LinkModel  # noqa
 from app.adapters.orm.credentials.abusive_experience_keys import AbusiveExperienceKeyModel  # noqa
 from app.adapters.orm.credentials.virus_total_keys import VirusTotalKeyModel  # noqa
-from app.adapters.orm.virus_total import VirusTotalModel  # noqa
+from app.adapters.orm.proxy import ProxyModel  # noqa
+from app.adapters.orm.result import ResultModel  # noqa
 
 
 config = context.config
@@ -40,7 +40,7 @@ def run_migrations_offline() -> None:
     output.
 
     """
-    url = SQLALCHEMY_DATABASE_URL
+    url = sync_database_url
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -60,7 +60,7 @@ def run_migrations_online() -> None:
 
     """
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = SQLALCHEMY_DATABASE_URL
+    configuration["sqlalchemy.url"] = sync_database_url
 
     connectable = engine_from_config(
         configuration,

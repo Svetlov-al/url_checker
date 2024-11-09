@@ -14,7 +14,6 @@ from app.infra.settings.stage.app import AppSettings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db: Database = app.container.core.db.provided()  # noqa
-    await db.create_database()
     yield
 
 

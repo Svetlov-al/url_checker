@@ -14,7 +14,7 @@ from redis.asyncio import Redis
 
 class CoreContainer(containers.DeclarativeContainer):
     settings: Factory[AppSettings] = providers.Callable(get_app_settings)
-    db: Factory[Database] = providers.Singleton(Database, db_url=settings().POSTGRES_URI)
+    db: Factory[Database] = providers.Singleton(Database, db_url=settings().SQLALCHEMY_DATABASE_URL)
 
     redis_pool: Factory[Redis] = providers.Resource(
         init_redis_pool,

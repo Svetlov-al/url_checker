@@ -5,13 +5,13 @@ from asyncio import Semaphore
 
 import httpx
 from app.adapters.repositories.api_keys_repository import AbstractAPIKeyRepository
-from app.logic.message_processors.base import IMessageProcessor
+from app.logic.message_processors.base import AbstractMessageChecker
 
 
 logger = logging.getLogger(__name__)
 
 
-class AbusiveExperienceChecker(IMessageProcessor):
+class AbusiveExperienceChecker(AbstractMessageChecker):
     def __init__(
         self,
         api_key_repo: AbstractAPIKeyRepository,
@@ -23,10 +23,11 @@ class AbusiveExperienceChecker(IMessageProcessor):
     async def process_batch(
         self,
         messages: list[bytes],
+        proxy: str | None = None,
     ) -> dict[str, bool]:
         results = {}
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(proxy=proxy) as client:
             tasks = []
             for m in messages:
                 tasks.append(self._process_message(client, m, results))

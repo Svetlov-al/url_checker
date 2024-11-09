@@ -52,8 +52,7 @@ class LinkRepository(AbstractLinkRepository):
                     await session.execute(
                         select(self.__model)
                         .options(
-                            selectinload(self.__model.virus_total),
-                            selectinload(self.__model.abusive_experience),
+                            selectinload(self.__model.result),
                         )
                         .filter_by(
                             url=url,
@@ -74,8 +73,7 @@ class LinkRepository(AbstractLinkRepository):
                 await session.execute(
                     select(self.__model)
                     .options(
-                        selectinload(self.__model.virus_total),
-                        selectinload(self.__model.abusive_experience),
+                        selectinload(self.__model.result),
                     )
                     .limit(limit)
                     .offset(offset),
@@ -101,8 +99,7 @@ class LinkRepository(AbstractLinkRepository):
                 await session.execute(
                     select(self.__model)
                     .options(
-                        selectinload(self.__model.virus_total),
-                        selectinload(self.__model.abusive_experience),
+                        selectinload(self.__model.result),
                     )
                     .filter(self.__model.url.in_(urls)),
                 )
@@ -123,10 +120,10 @@ class LinkRepository(AbstractLinkRepository):
             id=link_model.id,
             url=link_model.url,
             virus_total=(
-                link_model.virus_total.result if link_model.virus_total else None
+                link_model.result.virus_total if link_model.result else None
             ),
             abusive_exp=(
-                link_model.abusive_experience.result if link_model.abusive_experience else None
+                link_model.result.abusive_experience if link_model.result else None
             ),
             created_at=link_model.created_at,
             updated_at=link_model.updated_at,

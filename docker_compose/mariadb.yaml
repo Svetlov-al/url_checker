@@ -1,0 +1,27 @@
+networks:
+  dev:
+    driver: bridge
+
+services:
+  db:
+    image: mariadb:10.6.8
+    container_name: db
+    ports:
+      - ${DB_PORT:?}:3306
+    volumes:
+      - mysql_data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?}
+      MYSQL_USER: ${MYSQL_USER:?}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?}
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -u ${MYSQL_USER} -p${MYSQL_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - dev
+
+volumes:
+  mysql_data:

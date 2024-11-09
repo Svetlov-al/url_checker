@@ -18,8 +18,8 @@ class AppSettings(BaseAppSettings):
     PORT: int = Field(5005, validation_alias="PORT")
     RELOAD: bool = Field(True, validation_alias="RELOAD")
     """POSTGRES SETTINGS."""
-    POSTGRES_SCHEMA: str = Field(..., validation_alias="POSTGRES_SCHEMA")
-    POSTGRES_URI: str = Field(..., validation_alias="POSTGRES_URI")
+
+    SQLALCHEMY_DATABASE_URL: str = Field(..., validation_alias="SQLALCHEMY_DATABASE_URL")
 
     MAX_CONNECTION: int = 10
 

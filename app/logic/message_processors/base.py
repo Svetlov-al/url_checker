@@ -8,9 +8,9 @@ import httpx
 
 
 @dataclass
-class IMessageProcessor(ABC):
+class AbstractMessageChecker(ABC):
     @abstractmethod
-    async def process_batch(self, messages: list[bytes]) -> dict[int, bool]:
+    async def process_batch(self, messages: list[bytes], proxy: str | None = None) -> dict[int, bool]:
         raise NotImplementedError
 
     @abstractmethod

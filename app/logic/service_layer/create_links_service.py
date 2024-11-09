@@ -5,7 +5,6 @@ from app.adapters.repositories.link_repository import AbstractLinkRepository
 from app.domain.entities.link_entity import LinkEntity
 from app.dtos.create_links_dto import CreateLinksDTO
 from app.infra.broker.base import BaseBroker
-from app.logic.service_layer.helpers.message import Message
 from app.logic.service_layer.helpers.normalize_url import normalize_url
 
 
@@ -31,13 +30,9 @@ class CreateLinksService:
         created_links = await self.repo.create_many(new_links)
 
         # => Подготавливаем сообщения для отправки в очереди
-        messages = await self.prepare_messages(created_links)
+        messages = [orjson.dumps({str(link.id): link.url}) for link in created_links]
 
         await self.redis_broker.publish_batch("virus_total", messages)
         await self.redis_broker.publish_batch("abusive_exp", messages)
 
         return len(created_links)
-
-    @staticmethod
-    async def prepare_messages(messages: list[Message]) -> list[bytes]:
-        return [orjson.dumps({str(link.id): link.url}) for link in messages]

@@ -1,7 +1,7 @@
 DC = docker compose
 APP_DEV = docker_compose/app.dev.yaml
 REDIS = docker_compose/redis.yaml
-POSTGRES = docker_compose/postgres.yaml
+MYSQL = docker_compose/mariadb.yaml
 APP_SERVICE = main-app
 CELERY = docker_compose/celery.yaml
 ENV = --env-file .env
@@ -24,11 +24,11 @@ app-dev-logs:
 
 .PHONY: storages
 storage:
-	${DC} -f ${POSTGRES} ${ENV} up -d --build
+	${DC} -f ${MYSQL} ${ENV} up -d --build
 
 .PHONY: storages
 storage-down:
-	${DC} -f ${POSTGRES} ${ENV} down
+	${DC} -f ${MYSQL} ${ENV} down
 
 .PHONY: down-dev
 down-dev:
