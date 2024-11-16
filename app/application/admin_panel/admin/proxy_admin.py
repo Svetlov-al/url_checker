@@ -10,6 +10,7 @@ class ProxyModelAdmin(ModelView, model=ProxyModel):
         ProxyModel.is_active,
         ProxyModel.created_at,
         ProxyModel.updated_at,
+        ProxyModel.api_keys,
     )
 
     is_async = True

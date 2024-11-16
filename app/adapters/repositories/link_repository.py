@@ -127,4 +127,5 @@ class LinkRepository(AbstractLinkRepository):
             ),
             created_at=link_model.created_at,
             updated_at=link_model.updated_at,
+            complete_date=link_model.result.complete_date if link_model.result else None,
         )

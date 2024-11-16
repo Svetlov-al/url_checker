@@ -1,10 +1,14 @@
+from datetime import datetime
+from enum import StrEnum
+
 from app.adapters.orm.mixins.timestamp import TimestampMixin
 from app.database.settings.base import Base
 from sqlalchemy import (
-    Boolean,
+    DateTime,
     ForeignKey,
     Integer,
 )
+from sqlalchemy.dialects.mysql import ENUM
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
@@ -12,16 +16,35 @@ from sqlalchemy.orm import (
 )
 
 
+class ResultStatus(StrEnum):
+    GOOD = "good"
+    FAIL = "fail"
+    WAITING = "waiting"
+
+
 class ResultModel(Base, TimestampMixin):
     __tablename__ = "result"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # noqa: A003
 
-    virus_total: Mapped[bool] = mapped_column(Boolean, nullable=True)
-    abusive_experience: Mapped[bool] = mapped_column(Boolean, nullable=True)
+    virus_total: Mapped[ResultStatus] = mapped_column(
+        ENUM(ResultStatus),
+        nullable=False,
+        default=ResultStatus.WAITING,
+    )
+    abusive_experience: Mapped[ResultStatus] = mapped_column(
+        ENUM(ResultStatus),
+        nullable=False,
+        default=ResultStatus.WAITING,
+    )
 
     link_id: Mapped[int] = mapped_column(Integer, ForeignKey("link.id", ondelete="CASCADE"), unique=True)
     link: Mapped["LinkModel"] = relationship("LinkModel", back_populates="result")  # noqa
+
+    complete_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     def __repr__(self) -> str:
         return (

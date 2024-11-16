@@ -15,9 +15,11 @@ load_dotenv()
 sync_database_url = os.getenv("SYNC_SQLALCHEMY_DATABASE_URL")
 
 from app.adapters.orm.base_link import LinkModel  # noqa
-from app.adapters.orm.credentials.abusive_experience_keys import AbusiveExperienceKeyModel  # noqa
-from app.adapters.orm.credentials.virus_total_keys import VirusTotalKeyModel  # noqa
-from app.adapters.orm.proxy import ProxyModel  # noqa
+from app.adapters.orm.credentials.api_keys import APIKeyModel  # noqa
+from app.adapters.orm.proxy import (  # noqa
+    ProxyKeysAssociation,
+    ProxyModel,
+)
 from app.adapters.orm.result import ResultModel  # noqa
 
 

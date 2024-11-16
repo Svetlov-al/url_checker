@@ -1,9 +1,13 @@
 import abc
 import logging
 from collections.abc import Callable
+from datetime import datetime
 from typing import AsyncContextManager
 
-from app.adapters.orm.result import ResultModel
+from app.adapters.orm.result import (
+    ResultModel,
+    ResultStatus,
+)
 from app.domain.entities.result_entity import ResultEntity
 from sqlalchemy import select
 from sqlalchemy.dialects.mysql import insert
@@ -143,11 +147,15 @@ class ResultRepository(AbstractResultRepository):
 
         result_model = ResultModel(link_id=result_entity.link_id)
 
-        if "virus_total" in fields_to_update and result_entity.virus_total is not None:
+        if "virus_total" in fields_to_update and result_entity.virus_total != ResultStatus.WAITING:
             result_model.virus_total = result_entity.virus_total
+            if result_entity.abusive_experience != ResultStatus.WAITING:
+                result_model.complete_date = datetime.now()
 
-        if "abusive_experience" in fields_to_update and result_entity.abusive_experience is not None:
+        if "abusive_experience" in fields_to_update and result_entity.abusive_experience != ResultStatus.WAITING:
             result_model.abusive_experience = result_entity.abusive_experience
+            if result_entity.virus_total != ResultStatus.WAITING:
+                result_model.complete_date = datetime.now()
 
         return result_model
 
@@ -158,4 +166,5 @@ class ResultRepository(AbstractResultRepository):
             link_id=result_model.link_id,
             virus_total=result_model.virus_total,
             abusive_experience=result_model.abusive_experience,
+            complete_date=result_model.complete_date,
         )
