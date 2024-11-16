@@ -6,10 +6,6 @@ from app.adapters.repositories.link_repository import (
     AbstractLinkRepository,
     LinkRepository,
 )
-from app.adapters.repositories.proxy_repository import (
-    AbstractProxyRepository,
-    ProxyRepository,
-)
 from app.adapters.repositories.result_repository import (
     AbstractResultRepository,
     ResultRepository,
@@ -46,15 +42,14 @@ class InfrastructureContainer(containers.DeclarativeContainer):
         session_factory=core.db.provided.session,
     )
 
-    proxy_repo: Factory[AbstractProxyRepository] = providers.Factory(
-        ProxyRepository,
-        session_factory=core.db.provided.session,
-    )
-
     vt_message_checker: Factory[AbstractMessageChecker] = providers.Factory(
         VirusTotalChecker,
+        api_key_repo=api_key_repo.provided,
+        broker=core.redis_broker.provided,
     )
 
     ae_message_checker: Factory[AbstractMessageChecker] = providers.Factory(
         AbusiveExperienceChecker,
+        api_key_repo=api_key_repo.provided,
+        broker=core.redis_broker.provided,
     )

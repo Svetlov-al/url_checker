@@ -18,6 +18,7 @@ class ServicesContainer(containers.DeclarativeContainer):
     create_links_service: Factory[CreateLinksService] = providers.Factory(
         CreateLinksService,
         repo=infrastructure.link_repo.provided,
+        result_repo=infrastructure.result_repo.provided,
         redis_broker=core.redis_broker.provided,
     )
 

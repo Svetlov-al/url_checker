@@ -73,7 +73,8 @@ class AbusiveExperienceChecker(AbstractMessageChecker):
                             elif abusive_status == "PASSING":
                                 is_abusive = False
                             else:
-                                is_abusive = None
+                                is_abusive = False
+
                             results[str(Id)] = is_abusive
 
                             # => Обновляем лимит для ключа

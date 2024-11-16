@@ -1,10 +1,12 @@
 import asyncio
 
-from ..adapters.orm.credentials.abusive_experience_keys import AbusiveExperienceKeyModel
-from ..adapters.orm.credentials.virus_total_keys import VirusTotalKeyModel
+from ..adapters.orm.credentials.api_keys import APIKeySourceType
 from ..adapters.repositories.api_keys_repository import AbstractAPIKeyRepository
-from ..adapters.repositories.proxy_repository import AbstractProxyRepository
 from ..adapters.repositories.result_repository import AbstractResultRepository
+from ..core.constance import (
+    SECONDS_IN_HOUR,
+    VT_DELAY,
+)
 from ..domain.entities.result_entity import ResultEntity
 from ..logic.message_processors.base import AbstractMessageChecker
 from .broker.base import BaseBroker
@@ -13,37 +15,38 @@ from .ioc.container.application import AppContainer
 
 
 @celery_app.task
-def vt_validate(queue: str = 'virus_total', batch_size: int = 1) -> dict[int, bool | None]:
+def vt_validate(queue: str = 'virus_total') -> dict[int, str]:
     loop = asyncio.get_event_loop()
-    return loop.run_until_complete(vt_validate_async(queue, batch_size))
+    return loop.run_until_complete(vt_validate_async(queue))
 
 
 @celery_app.task
-def ae_validate(queue: str = 'abusive_exp', batch_size: int = 1) -> dict[int, bool | None]:
+def ae_validate(queue: str = 'abusive_exp') -> dict[int, bool | None]:
     loop = asyncio.get_event_loop()
-    return loop.run_until_complete(ae_validate_async(queue, batch_size))
+    return loop.run_until_complete(ae_validate_async(queue))
 
 
-async def vt_validate_async(queue: str, batch_size: int) -> dict[int, bool | None]:
+async def vt_validate_async(queue: str) -> dict[int, str]:
     container = AppContainer()
     broker: BaseBroker = container.core.redis_broker.provided()
 
-    api_key_repo: AbstractAPIKeyRepository = container.infrastructure.api_key_repo(model=VirusTotalKeyModel)
+    api_key_repo: AbstractAPIKeyRepository = container.infrastructure.api_key_repo()
     result_repo: AbstractResultRepository = container.infrastructure.result_repo()
 
+    api_keys = await api_key_repo.load_keys_from_db(keys_type=APIKeySourceType.VIRUS_TOTAL)
     vt_message_checker: AbstractMessageChecker = container.infrastructure.vt_message_checker(
-        api_key_repo=api_key_repo,
+        api_keys_entity=api_keys,
     )
 
-    proxy_repo: AbstractProxyRepository = container.infrastructure.proxy_repo()
-    if active_proxy := (await proxy_repo.get()):
-        proxy_url = active_proxy.url
-    else:
-        proxy_url = None
+    total_requests = 0
+    for key in api_keys:
+        max_requests_per_hour = SECONDS_IN_HOUR // VT_DELAY
+        available_requests = min(max_requests_per_hour, key.limit)
+        total_requests += available_requests
 
-    messages = await broker.read_messages(queue_name=queue, count=batch_size)
+    messages = await broker.read_messages(queue_name=queue, count=total_requests)
 
-    results = await vt_message_checker.process_batch(messages, proxy=proxy_url)
+    results = await vt_message_checker.process_batch(messages)
 
     links_to_update = [
         ResultEntity(
@@ -61,7 +64,7 @@ async def ae_validate_async(queue: str, batch_size: int) -> dict[int, bool | Non
     container = AppContainer()
     broker: BaseBroker = container.core.redis_broker.provided()
 
-    api_key_repo: AbstractAPIKeyRepository = container.infrastructure.api_key_repo(model=AbusiveExperienceKeyModel)
+    api_key_repo: AbstractAPIKeyRepository = container.infrastructure.api_key_repo()
 
     result_repo: AbstractResultRepository = container.infrastructure.result_repo()
 
@@ -69,15 +72,9 @@ async def ae_validate_async(queue: str, batch_size: int) -> dict[int, bool | Non
         api_key_repo=api_key_repo,
     )
 
-    proxy_repo: AbstractProxyRepository = container.infrastructure.proxy_repo()
-    if active_proxy := (await proxy_repo.get()):
-        proxy_url = active_proxy.url
-    else:
-        proxy_url = None
-
     messages = await broker.read_messages(queue_name=queue, count=batch_size)
 
-    results = await ae_message_checker.process_batch(messages, proxy=proxy_url)
+    results = await ae_message_checker.process_batch(messages)
 
     links_to_update = [
         ResultEntity(

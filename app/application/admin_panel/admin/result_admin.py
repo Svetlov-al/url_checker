@@ -10,6 +10,7 @@ class ResultModelAdmin(ModelView, model=ResultModel):
         ResultModel.link,
         ResultModel.created_at,
         ResultModel.updated_at,
+        ResultModel.complete_date,
     )
 
     is_async = True

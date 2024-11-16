@@ -5,8 +5,13 @@ import logging
 from asyncio import Semaphore
 
 import httpx
+from app.adapters.orm.result import ResultStatus
 from app.adapters.repositories.api_keys_repository import AbstractAPIKeyRepository
+from app.domain.entities.api_key_entity import APIKeyEntity
+from app.infra.broker.base import BaseBroker
 from app.logic.message_processors.base import AbstractMessageChecker
+from fake_headers import Headers
+from orjson import orjson
 
 
 logger = logging.getLogger(__name__)
@@ -14,25 +19,31 @@ logger = logging.getLogger(__name__)
 
 class VirusTotalChecker(AbstractMessageChecker):
     def __init__(
-        self,
-        api_key_repo: AbstractAPIKeyRepository,
-        max_concurrent_requests: int = 10,
+            self,
+            api_key_repo: AbstractAPIKeyRepository,
+            broker: BaseBroker,
+            api_keys_entity: list[APIKeyEntity],
+            max_concurrent_requests: int = 10,
+
     ) -> None:
         self.semaphore: Semaphore = Semaphore(max_concurrent_requests)
         self.api_key_repo: AbstractAPIKeyRepository = api_key_repo
+        self.broker: BaseBroker = broker
+        self.api_key_locks = {key.api_key: asyncio.Lock() for key in api_keys_entity}
+        self.api_keys: list[APIKeyEntity] = api_keys_entity
 
     async def process_batch(
-        self,
-        messages: list[bytes],
-        proxy: str | None = None,
+            self,
+            messages: list[bytes],
     ) -> dict[str, bool]:
         results = {}
 
-        async with httpx.AsyncClient(proxy=proxy) as client:
-            tasks = []
-            for m in messages:
-                tasks.append(self._process_message(client, m, results))
-            await asyncio.gather(*tasks)
+        tasks = []
+        for m in messages:
+            tasks.append(self._process_message(m, results))
+
+        await asyncio.gather(*tasks)
+
         logger.info(
             "Обработка сообщений завершена.\n"
             f"Количество обработанных сообщений: {len(results)}",
@@ -40,55 +51,111 @@ class VirusTotalChecker(AbstractMessageChecker):
         return results
 
     async def _process_message(
-        self, client: httpx.AsyncClient, message: bytes, results: dict[str, bool | None],
+            self,
+            message: bytes,
+            results: dict[str, str],
+    ) -> None:
+        try:
+            message_data = json.loads(message)
+            for Id, link in message_data.items():
+                await self._process_link(Id, link, results)
+        except Exception as e:
+            logger.error(f"Ошибка обработки сообщения: {e}")
+
+    async def _process_link(
+            self,
+            link_id: str,
+            link: str,
+            results: dict[str, str],
     ) -> None:
         async with self.semaphore:
-            try:
-                message_data = json.loads(message)
-                for Id, link in message_data.items():
-                    encoded_url = base64.urlsafe_b64encode(link.encode()).decode().rstrip("=")
-                    # => Загрузка ключей с лимитами
-                    keys_with_limits = await self.api_key_repo.load_keys_from_db()
-                    available_keys = [key for key, limit in keys_with_limits.items() if limit > 0]
+            for index, key in enumerate(self.api_keys):
+                if not key.is_valid:
+                    logger.warning(f"Ключ {key.api_key} заблокирован или недействителен.")
+                    await self.check_last_key_and_push_message(index, link_id, link)
+                    continue
 
-                    while available_keys:
-                        api_key = available_keys.pop(0)
-                        logger.info(f"Обработка сообщения c ID: {Id}, url: {link}")
+                if key.limit <= 0:
+                    logger.warning(f"Ключ {key.api_key} исчерпал лимит.")
+                    await self.check_last_key_and_push_message(index, link_id, link)
+                    continue
 
-                        # => Отправляем запрос к API "Virus Total"
-                        response = await client.get(
-                            f'https://www.virustotal.com/api/v3/urls/{encoded_url}',
-                            headers={
-                                "accept": "application/json",
-                                "x-apikey": api_key,
-                            },
+                lock = self.api_key_locks.get(key.api_key)
+
+                if lock:
+                    if lock.locked() and index == len(self.api_keys) - 1:
+                        logger.warning(f"Ключ {key.key_id} последний и заблокирован, ждем завершения.")
+                        await lock.acquire()
+
+                    elif lock.locked() and index < len(self.api_keys) - 1:
+                        logger.warning(f"Ключ не последний {key.key_id} и заблокирован, пробуем следующий.")
+                        continue
+
+                    await lock.acquire()
+
+                    headers_generator = Headers(
+                        browser="chrome",
+                        os="win",
+                        headers=True,
+                    )
+
+                    headers = headers_generator.generate()
+                    headers["x-apikey"] = key.api_key
+                    proxy_url = key.get_proxy_url()
+
+                    try:
+                        encoded_url = base64.urlsafe_b64encode(link.encode()).decode().rstrip("=")
+                        async with httpx.AsyncClient(
+                                proxies={"http": proxy_url, "https": proxy_url} if proxy_url else None,
+                        ) as client:
+                            response = await client.get(
+                                f'https://www.virustotal.com/api/v3/urls/{encoded_url}',
+                                headers=headers,
+                            )
+                            if response.status_code == httpx.codes.OK:
+                                data = response.json()
+                                is_malicious = data['data']['attributes']['last_analysis_stats']['malicious'] > 0
+                                results[link_id] = ResultStatus.FAIL if is_malicious else ResultStatus.GOOD
+                                key.used_limit += 1
+                                await self.api_key_repo.update_key_usage(key_id=key.key_id)
+                                if key.delay:
+                                    await asyncio.sleep(key.delay)
+                                break
+
+                            elif response.status_code in [httpx.codes.UNAUTHORIZED, httpx.codes.FORBIDDEN]:
+                                logger.warning(f"API ключ {key.api_key} заблокирован или недействителен.")
+                                await self.api_key_repo.mark_as_invalid(key_id=key.key_id)
+                                key.is_valid = False
+                                await self.check_last_key_and_push_message(index, link_id, link)
+                                continue
+
+                            elif response.status_code == httpx.codes.TOO_MANY_REQUESTS:
+                                logger.warning(f"API ключ {key.api_key} превысил лимит запросов.")
+                                await self.check_last_key_and_push_message(index, link_id, link)
+                                await asyncio.sleep(15)
+                                continue
+                            else:
+                                results[link_id] = ResultStatus.WAITING
+                                key.used_limit += 1
+                                await self.api_key_repo.update_key_usage(key_id=key.key_id)
+                                await self.broker.publish_message(
+                                    "virus_total",
+                                    value=orjson.dumps({link_id: link}),
+                                )
+                    except httpx.HTTPStatusError as e:
+                        logger.error(f"HTTP ошибка при запросе: {e}")
+                        results[link_id] = ResultStatus.WAITING
+                        await self.broker.publish_message(
+                            "virus_total",
+                            value=orjson.dumps({link_id: link}),
                         )
-                        if response.status_code == 200:
-                            data = response.json()
-                            is_malicious = data['data']['attributes']['last_analysis_stats']['malicious'] > 0
-                            results[str(Id)] = is_malicious
+                    finally:
+                        if lock:
+                            lock.release()
 
-                            # => Обновляем лимит для ключа
-                            await self.api_key_repo.update_key_usage(api_key)
-                            break
-                        elif response.status_code in [401, 403]:
-                            await self.api_key_repo.mark_as_invalid(api_key)
-                            logger.warning(f"API ключ {api_key} был заблокирован или недействителен.")
-                            # => Продолжаем цикл для следующего ключа
-                            continue
-                        elif response.status_code == 429:
-                            logger.warning(f"API ключ {api_key} превысил лимит запросов.")
-                            # => Пытаемся использовать следующий ключ
-                            continue
-                        else:
-                            results[str(Id)] = None
-                            # => Прерываем обработку для этого сообщения
-                            break
-                    if str(Id) not in results:
-                        results[str(Id)] = None
-                        logger.warning("Нет доступных ключей для обработки сообщения.")
-
-            except json.JSONDecodeError:
-                logger.error(f"[VirusTotal]: Ошибка декодирования сообщения:\nСообщение: {message}")
-            except Exception as e:
-                logger.error(f"[VirusTotal]: Неизвестная ошибка обработки сообщения:\nError: {e}")
+    async def check_last_key_and_push_message(self, index: int, link_id: str, link: str) -> None:
+        if index == len(self.api_keys) - 1:
+            await self.broker.publish_message(
+                "virus_total",
+                value=orjson.dumps({link_id: link}),
+            )

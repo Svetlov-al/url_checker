@@ -4,15 +4,15 @@ from abc import (
 )
 from dataclasses import dataclass
 
-import httpx
+from app.adapters.orm.result import ResultStatus
 
 
 @dataclass
 class AbstractMessageChecker(ABC):
     @abstractmethod
-    async def process_batch(self, messages: list[bytes], proxy: str | None = None) -> dict[int, bool]:
+    async def process_batch(self, messages: list[bytes]) -> dict[int, ResultStatus]:
         raise NotImplementedError
 
     @abstractmethod
-    async def _process_message(self, client: httpx.AsyncClient, message: bytes, results: dict) -> None:
+    async def _process_message(self, message: bytes, results: dict) -> None:
         raise NotImplementedError

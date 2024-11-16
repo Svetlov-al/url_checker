@@ -7,11 +7,11 @@ from pydantic import BaseModel
 class LinkDetailSchema(BaseModel):
     id: int  # noqa: A003
     url: str
-    virus_total: str
-    abusive_exp: str
+    virus_total: str | None
+    abusive_exp: str | None
     created_at: datetime
     updated_at: datetime
-    complete_date: datetime
+    complete_date: datetime | None
 
     @classmethod
     def from_entity(cls, link: LinkEntity) -> 'LinkDetailSchema':

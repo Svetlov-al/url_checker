@@ -5,6 +5,7 @@ from app.adapters.orm.mixins.timestamp import TimestampMixin
 from app.database.settings.base import Base
 from sqlalchemy import (
     DateTime,
+    event,
     ForeignKey,
     Integer,
 )
@@ -55,3 +56,11 @@ class ResultModel(Base, TimestampMixin):
         return (
             f"LinkID: {self.id}"
         )
+
+
+@event.listens_for(ResultModel, 'before_update')
+def before_update_listener(mapper, connection, target):
+    if target.virus_total != ResultStatus.WAITING and target.abusive_experience != ResultStatus.WAITING:
+        if target.virus_total is not None and target.abusive_experience is not None:
+            if target.complete_date is None:
+                target.complete_date = datetime.now()

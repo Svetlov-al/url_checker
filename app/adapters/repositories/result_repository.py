@@ -1,7 +1,6 @@
 import abc
 import logging
 from collections.abc import Callable
-from datetime import datetime
 from typing import AsyncContextManager
 
 from app.adapters.orm.result import (
@@ -9,10 +8,15 @@ from app.adapters.orm.result import (
     ResultStatus,
 )
 from app.domain.entities.result_entity import ResultEntity
-from sqlalchemy import select
+from app.logic.service_layer.helpers.message import Message
+from sqlalchemy import (
+    select,
+    update,
+)
 from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 
 class AbstractResultRepository(abc.ABC):
@@ -35,6 +39,9 @@ class AbstractResultRepository(abc.ABC):
         raise NotImplementedError
 
     async def create_or_update_virus_total(self, results: list[ResultEntity]) -> list[ResultEntity]:
+        raise NotImplementedError
+
+    async def reset_results(self, link_ids: list[int]) -> list[Message]:
         raise NotImplementedError
 
 
@@ -138,10 +145,37 @@ class ResultRepository(AbstractResultRepository):
 
         return [self._from_orm(result) for result in result_models]
 
+    async def reset_results(self, link_ids: list[int]) -> list[Message]:
+        async with self.session_factory() as session:
+            result_models = await session.execute(
+                select(self.__model)
+                .where(self.__model.link_id.in_(link_ids))
+                .options(joinedload(self.__model.link)),
+            )
+            result_models = result_models.scalars().all()
+
+            await session.execute(
+                update(self.__model)
+                .where(self.__model.link_id.in_(link_ids))
+                .values(
+                    virus_total=ResultStatus.WAITING,
+                    abusive_experience=ResultStatus.WAITING,
+                    complete_date=None,
+                ),
+            )
+
+            await session.commit()
+
+        return [
+            Message(id=result.link_id, url=result.link.url if result.link else None)
+            for result in result_models
+        ]
+
     @staticmethod
     def _to_orm(result_entity: ResultEntity, fields_to_update: set = None) -> ResultModel:
         """Преобразует доменную сущность в ORM модель, обновляя только
         переданные поля."""
+
         if fields_to_update is None:
             fields_to_update = {"virus_total", "abusive_experience"}
 
@@ -149,13 +183,9 @@ class ResultRepository(AbstractResultRepository):
 
         if "virus_total" in fields_to_update and result_entity.virus_total != ResultStatus.WAITING:
             result_model.virus_total = result_entity.virus_total
-            if result_entity.abusive_experience != ResultStatus.WAITING:
-                result_model.complete_date = datetime.now()
 
         if "abusive_experience" in fields_to_update and result_entity.abusive_experience != ResultStatus.WAITING:
             result_model.abusive_experience = result_entity.abusive_experience
-            if result_entity.virus_total != ResultStatus.WAITING:
-                result_model.complete_date = datetime.now()
 
         return result_model
 
