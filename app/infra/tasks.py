@@ -21,7 +21,7 @@ def vt_validate(queue: str = 'virus_total') -> dict[int, str]:
 
 
 @celery_app.task
-def ae_validate(queue: str = 'abusive_exp') -> dict[int, bool | None]:
+def ae_validate(queue: str = 'abusive_exp') -> dict[int, str]:
     loop = asyncio.get_event_loop()
     return loop.run_until_complete(ae_validate_async(queue))
 
@@ -36,6 +36,7 @@ async def vt_validate_async(queue: str) -> dict[int, str]:
     api_keys = await api_key_repo.load_keys_from_db(keys_type=APIKeySourceType.VIRUS_TOTAL)
     vt_message_checker: AbstractMessageChecker = container.infrastructure.vt_message_checker(
         api_keys_entity=api_keys,
+        queue=queue,
     )
 
     total_requests = 0
@@ -60,7 +61,7 @@ async def vt_validate_async(queue: str) -> dict[int, str]:
     return results
 
 
-async def ae_validate_async(queue: str, batch_size: int) -> dict[int, bool | None]:
+async def ae_validate_async(queue: str) -> dict[int, str]:
     container = AppContainer()
     broker: BaseBroker = container.core.redis_broker.provided()
 
@@ -68,11 +69,17 @@ async def ae_validate_async(queue: str, batch_size: int) -> dict[int, bool | Non
 
     result_repo: AbstractResultRepository = container.infrastructure.result_repo()
 
+    api_keys = await api_key_repo.load_keys_from_db(keys_type=APIKeySourceType.ABUSIVE_EXPERIENCE)
     ae_message_checker: AbstractMessageChecker = container.infrastructure.ae_message_checker(
-        api_key_repo=api_key_repo,
+        api_keys_entity=api_keys,
+        queue=queue,
     )
 
-    messages = await broker.read_messages(queue_name=queue, count=batch_size)
+    total_requests = 0
+    for key in api_keys:
+        total_requests += key.limit
+
+    messages = await broker.read_messages(queue_name=queue, count=total_requests)
 
     results = await ae_message_checker.process_batch(messages)
 

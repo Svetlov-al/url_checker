@@ -23,6 +23,7 @@ class VirusTotalChecker(AbstractMessageChecker):
             api_key_repo: AbstractAPIKeyRepository,
             broker: BaseBroker,
             api_keys_entity: list[APIKeyEntity],
+            queue: str = "virus_total",
             max_concurrent_requests: int = 10,
 
     ) -> None:
@@ -31,6 +32,7 @@ class VirusTotalChecker(AbstractMessageChecker):
         self.broker: BaseBroker = broker
         self.api_key_locks = {key.api_key: asyncio.Lock() for key in api_keys_entity}
         self.api_keys: list[APIKeyEntity] = api_keys_entity
+        self.queue: str = queue
 
     async def process_batch(
             self,
@@ -139,15 +141,15 @@ class VirusTotalChecker(AbstractMessageChecker):
                                 key.used_limit += 1
                                 await self.api_key_repo.update_key_usage(key_id=key.key_id)
                                 await self.broker.publish_message(
-                                    "virus_total",
-                                    value=orjson.dumps({link_id: link}),
+                                    queue_name=self.queue,
+                                    message=orjson.dumps({link_id: link}),
                                 )
                     except httpx.HTTPStatusError as e:
                         logger.error(f"HTTP ошибка при запросе: {e}")
                         results[link_id] = ResultStatus.WAITING
                         await self.broker.publish_message(
-                            "virus_total",
-                            value=orjson.dumps({link_id: link}),
+                            queue_name=self.queue,
+                            message=orjson.dumps({link_id: link}),
                         )
                     finally:
                         if lock:
@@ -156,6 +158,6 @@ class VirusTotalChecker(AbstractMessageChecker):
     async def check_last_key_and_push_message(self, index: int, link_id: str, link: str) -> None:
         if index == len(self.api_keys) - 1:
             await self.broker.publish_message(
-                "virus_total",
-                value=orjson.dumps({link_id: link}),
+                queue_name=self.queue,
+                message=orjson.dumps({link_id: link}),
             )

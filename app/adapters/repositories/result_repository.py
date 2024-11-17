@@ -10,6 +10,7 @@ from app.adapters.orm.result import (
 from app.domain.entities.result_entity import ResultEntity
 from app.logic.service_layer.helpers.message import Message
 from sqlalchemy import (
+    func,
     select,
     update,
 )
@@ -17,6 +18,7 @@ from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+from sqlalchemy.sql.expression import case
 
 
 class AbstractResultRepository(abc.ABC):
@@ -105,6 +107,10 @@ class ResultRepository(AbstractResultRepository):
 
                 stmt = insert(ResultModel).values(values_to_insert).on_duplicate_key_update(
                     virus_total=values_to_insert["virus_total"],
+                    complete_date=case(
+                        (ResultModel.abusive_experience != ResultStatus.WAITING, func.now()),
+                        else_=ResultModel.complete_date,
+                    ),
                 )
 
                 try:
@@ -114,7 +120,8 @@ class ResultRepository(AbstractResultRepository):
                         f"[ResultModel]: Ошибка при вставке для link_id {result_model.link_id}: {e.orig}",
                     )
 
-            await session.commit()
+            else:
+                await session.commit()
 
         return [self._from_orm(result) for result in result_models]
 
@@ -132,6 +139,10 @@ class ResultRepository(AbstractResultRepository):
 
                 stmt = insert(ResultModel).values(values_to_insert).on_duplicate_key_update(
                     abusive_experience=values_to_insert["abusive_experience"],
+                    complete_date=case(
+                        (ResultModel.virus_total != ResultStatus.WAITING, func.now()),
+                        else_=ResultModel.complete_date,
+                    ),
                 )
 
                 try:
@@ -140,8 +151,8 @@ class ResultRepository(AbstractResultRepository):
                     logger.error(
                         f"[ResultModel]: Ошибка при вставке для link_id {result_model.link_id}: {e.orig}",
                     )
-
-            await session.commit()
+            else:
+                await session.commit()
 
         return [self._from_orm(result) for result in result_models]
 
@@ -181,10 +192,10 @@ class ResultRepository(AbstractResultRepository):
 
         result_model = ResultModel(link_id=result_entity.link_id)
 
-        if "virus_total" in fields_to_update and result_entity.virus_total != ResultStatus.WAITING:
+        if "virus_total" in fields_to_update:
             result_model.virus_total = result_entity.virus_total
 
-        if "abusive_experience" in fields_to_update and result_entity.abusive_experience != ResultStatus.WAITING:
+        if "abusive_experience" in fields_to_update:
             result_model.abusive_experience = result_entity.abusive_experience
 
         return result_model

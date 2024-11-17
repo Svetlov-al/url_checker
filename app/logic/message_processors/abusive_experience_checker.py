@@ -4,8 +4,13 @@ import logging
 from asyncio import Semaphore
 
 import httpx
+from app.adapters.orm.result import ResultStatus
 from app.adapters.repositories.api_keys_repository import AbstractAPIKeyRepository
+from app.domain.entities.api_key_entity import APIKeyEntity
+from app.infra.broker.base import BaseBroker
 from app.logic.message_processors.base import AbstractMessageChecker
+from fake_headers import Headers
+from orjson import orjson
 
 
 logger = logging.getLogger(__name__)
@@ -13,25 +18,36 @@ logger = logging.getLogger(__name__)
 
 class AbusiveExperienceChecker(AbstractMessageChecker):
     def __init__(
-        self,
-        api_key_repo: AbstractAPIKeyRepository,
-        max_concurrent_requests: int = 10,
+            self,
+            api_key_repo: AbstractAPIKeyRepository,
+            broker: BaseBroker,
+            api_keys_entity: list[APIKeyEntity],
+            queue: str = "abusive_exp",
+            max_concurrent_requests: int = 10,
     ) -> None:
         self.semaphore: Semaphore = Semaphore(max_concurrent_requests)
+        self.broker: BaseBroker = broker
         self.api_key_repo: AbstractAPIKeyRepository = api_key_repo
+        self.api_key_locks = {key.api_key: asyncio.Lock() for key in api_keys_entity}
+        self.api_keys: list[APIKeyEntity] = api_keys_entity
+        self.queue: str = queue
 
     async def process_batch(
-        self,
-        messages: list[bytes],
-        proxy: str | None = None,
+            self,
+            messages: list[bytes],
     ) -> dict[str, bool]:
         results = {}
 
-        async with httpx.AsyncClient(proxy=proxy) as client:
-            tasks = []
-            for m in messages:
-                tasks.append(self._process_message(client, m, results))
-            await asyncio.gather(*tasks)
+        tasks = []
+        logger.info(
+            "Обработка сообщений начата.\n"
+            f"Количество сообщений в очереди: {len(messages)}",
+        )
+        for m in messages:
+            tasks.append(self._process_message(m, results))
+
+        await asyncio.gather(*tasks)
+
         logger.info(
             "Обработка сообщений завершена.\n"
             f"Количество обработанных сообщений: {len(results)}",
@@ -39,64 +55,127 @@ class AbusiveExperienceChecker(AbstractMessageChecker):
         return results
 
     async def _process_message(
-        self, client: httpx.AsyncClient, message: bytes, results: dict[str, bool | None],
+            self,
+            message: bytes,
+            results: dict[str, str],
+    ) -> None:
+        try:
+            message_data = json.loads(message)
+            for Id, link in message_data.items():
+                await self._process_link(Id, link, results)
+        except Exception as e:
+            logger.error(f"Ошибка обработки сообщения: {e}")
+
+    async def _process_link(
+            self,
+            link_id: str,
+            link: str,
+            results: dict[str, str],
     ) -> None:
         async with self.semaphore:
-            try:
-                message_data = json.loads(message)
-                for Id, link in message_data.items():
-                    # => Загрузка ключей с лимитами
-                    keys_with_limits = await self.api_key_repo.load_keys_from_db()
-                    available_keys = [key for key, limit in keys_with_limits.items() if limit > 0]
+            for index, key in enumerate(self.api_keys):
+                if not key.is_valid:
+                    logger.warning(f"Ключ {key.api_key} заблокирован или недействителен.")
+                    await self.check_last_key_and_push_message(index, link_id, link)
+                    continue
 
-                    while available_keys:
-                        api_key = available_keys.pop(0)
-                        logger.info(f"Обработка сообщения с ID: {Id}, url: {link}")
+                if key.limit <= 0:
+                    logger.warning(f"Ключ {key.api_key} исчерпал лимит.")
+                    await self.check_last_key_and_push_message(index, link_id, link)
+                    continue
 
-                        # => Отправляем запрос к API "Abusive Experience Report"
-                        response = await client.get(
-                            f'https://abusiveexperiencereport.googleapis.com/v1/sites/{link}',
-                            params={"key": api_key},
-                        )
+                lock = self.api_key_locks.get(key.api_key)
 
-                        if response.status_code == 200:
-                            data = response.json()
-                            # => Проверяем статус сайта на наличие нарушений
-                            abusive_status = data.get("abusiveStatus")
+                if lock:
+                    if lock.locked() and index == len(self.api_keys) - 1:
+                        logger.warning(f"Ключ {key.key_id} последний и заблокирован, ждем завершения.")
+                        await lock.acquire()
 
-                            if abusive_status == "FAILING":
-                                # => Сайт признан нарушающим (FAILING)
-                                is_abusive = True
-                            elif abusive_status == "WARNING":
-                                # => Сайт под предупреждением, но не нарушает
-                                is_abusive = False
-                            elif abusive_status == "PASSING":
-                                is_abusive = False
+                    elif lock.locked() and index < len(self.api_keys) - 1:
+                        logger.warning(f"Ключ не последний {key.key_id} и заблокирован, пробуем следующий.")
+                        continue
+
+                    await lock.acquire()
+
+                    headers_generator = Headers(
+                        browser="chrome",
+                        os="win",
+                        headers=True,
+                    )
+
+                    headers = headers_generator.generate()
+                    proxy_url = key.get_proxy_url()
+
+                    try:
+                        async with httpx.AsyncClient(
+                                proxies={"http": proxy_url, "https": proxy_url} if proxy_url else None,
+                        ) as client:
+                            # => Отправляем запрос к API "Abusive Experience Report"
+                            response = await client.get(
+                                f'https://abusiveexperiencereport.googleapis.com/v1/sites/{link}',
+                                headers=headers,
+                                params={"key": key.api_key},
+                            )
+
+                            if response.status_code == httpx.codes.OK:
+                                data = response.json()
+
+                                # => Проверяем статус сайта на наличие нарушений
+                                abusive_status = data.get("abusiveStatus")
+
+                                if abusive_status == "FAILING":
+                                    # => Сайт признан нарушающим (FAILING)
+                                    is_abusive = ResultStatus.FAIL
+                                elif abusive_status == "WARNING":
+                                    # => Сайт под предупреждением, но не нарушает
+                                    is_abusive = ResultStatus.GOOD
+                                elif abusive_status == "PASSING":
+                                    is_abusive = ResultStatus.GOOD
+                                else:
+                                    is_abusive = ResultStatus.EMPTY
+
+                                results[link_id] = is_abusive
+
+                                key.used_limit += 1
+                                await self.api_key_repo.update_key_usage(key_id=key.key_id)
+                                if key.delay:
+                                    await asyncio.sleep(key.delay)
+                                break
+
+                            elif response.status_code in [httpx.codes.UNAUTHORIZED, httpx.codes.FORBIDDEN]:
+                                logger.warning(f"API ключ {key.api_key} заблокирован или недействителен.")
+                                await self.api_key_repo.mark_as_invalid(key_id=key.key_id)
+                                key.is_valid = False
+                                await self.check_last_key_and_push_message(index, link_id, link)
+                                continue
+
+                            elif response.status_code == httpx.codes.TOO_MANY_REQUESTS:
+                                logger.warning(f"API ключ {key.api_key} превысил лимит запросов.")
+                                await self.check_last_key_and_push_message(index, link_id, link)
+                                await asyncio.sleep(15)
+                                continue
                             else:
-                                is_abusive = False
+                                results[link_id] = ResultStatus.WAITING
+                                key.used_limit += 1
+                                await self.api_key_repo.update_key_usage(key_id=key.key_id)
+                                await self.broker.publish_message(
+                                    queue_name=self.queue,
+                                    message=orjson.dumps({link_id: link}),
+                                )
+                    except httpx.HTTPStatusError as e:
+                        logger.error(f"HTTP ошибка при запросе: {e}")
+                        results[link_id] = ResultStatus.WAITING
+                        await self.broker.publish_message(
+                            queue_name=self.queue,
+                            message=orjson.dumps({link_id: link}),
+                        )
+                    finally:
+                        if lock:
+                            lock.release()
 
-                            results[str(Id)] = is_abusive
-
-                            # => Обновляем лимит для ключа
-                            await self.api_key_repo.update_key_usage(api_key)
-                            break
-                        elif response.status_code in [401, 403]:
-                            await self.api_key_repo.mark_as_invalid(api_key)
-                            logger.warning(f"API ключ {api_key} был заблокирован или недействителен.")
-                            continue
-                        elif response.status_code == 429:
-                            logger.warning(f"API ключ {api_key} превысил лимит запросов.")
-                            continue
-                        else:
-                            results[str(Id)] = None
-                            logger.error(f"Ошибка запроса для сайта {link}: {response.status_code}")
-                            break
-
-                    if str(Id) not in results:
-                        results[str(Id)] = None
-                        logger.warning(f"Нет доступных ключей для обработки сообщения с ID {Id}.")
-
-            except json.JSONDecodeError:
-                logger.error(f"[AbusiveExperience]: Ошибка декодирования сообщения:\nСообщение: {message}")
-            except Exception as e:
-                logger.error(f"[AbusiveExperience]: Неизвестная ошибка обработки сообщения:\nError: {e}")
+    async def check_last_key_and_push_message(self, index: int, link_id: str, link: str) -> None:
+        if index == len(self.api_keys) - 1:
+            await self.broker.publish_message(
+                queue_name=self.queue,
+                message=orjson.dumps({link_id: link}),
+            )

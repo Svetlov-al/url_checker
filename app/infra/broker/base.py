@@ -9,7 +9,7 @@ from dataclasses import dataclass
 class BaseBroker(ABC):
 
     @abstractmethod
-    async def publish_message(self, queue_name: str, value: bytes) -> None:
+    async def publish_message(self, queue_name: str, message: bytes) -> None:
         raise NotImplementedError
 
     @abstractmethod
