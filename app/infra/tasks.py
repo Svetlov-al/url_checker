@@ -9,6 +9,8 @@ from ..core.constance import (
 )
 from ..domain.entities.result_entity import ResultEntity
 from ..logic.message_processors.base import AbstractMessageChecker
+from ..logic.service_layer.helpers.distribute_links import _distribute_links_among_keys
+from ..logic.service_layer.helpers.prepare_messages import _prepare_messages
 from .broker.base import BaseBroker
 from .celery_worker import app as celery_app
 from .ioc.container.application import AppContainer
@@ -34,20 +36,28 @@ async def vt_validate_async(queue: str) -> dict[int, str]:
     result_repo: AbstractResultRepository = container.infrastructure.result_repo()
 
     api_keys = await api_key_repo.load_keys_from_db(keys_type=APIKeySourceType.VIRUS_TOTAL)
+
+    total_requests = 0
+    key_limits = {}
+    for key in api_keys:
+        max_requests_per_hour = SECONDS_IN_HOUR // VT_DELAY
+        available_requests = min(max_requests_per_hour, key.limit)
+        total_requests += available_requests
+        key_limits[key.api_key] = available_requests
+
+    messages = await broker.read_messages(queue_name=queue, count=total_requests)
+
+    links = _prepare_messages(messages=messages)
+
+    # => Распределяем сообщения по ключам, добавляя их в список APIKeyEntity.links_to_process
+    _distribute_links_among_keys(api_keys, links, key_limits)
+
     vt_message_checker: AbstractMessageChecker = container.infrastructure.vt_message_checker(
         api_keys_entity=api_keys,
         queue=queue,
     )
 
-    total_requests = 0
-    for key in api_keys:
-        max_requests_per_hour = SECONDS_IN_HOUR // VT_DELAY
-        available_requests = min(max_requests_per_hour, key.limit)
-        total_requests += available_requests
-
-    messages = await broker.read_messages(queue_name=queue, count=total_requests)
-
-    results = await vt_message_checker.process_batch(messages)
+    results = await vt_message_checker.process_batch()
 
     links_to_update = [
         ResultEntity(

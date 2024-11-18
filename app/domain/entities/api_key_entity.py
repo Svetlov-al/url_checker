@@ -15,6 +15,7 @@ class APIKeyEntity:
     used_limit: int
     is_valid: bool = True
     proxies: list[ProxyEntity] = field(default_factory=list)
+    links_to_process: list[dict[str, str]] = field(default_factory=list)
     delay: int | None = None
 
     @property
@@ -43,3 +44,7 @@ class APIKeyEntity:
                         is_active=proxy.is_active,
                     ),
                 )
+
+    def add_link(self, link: dict[str, str]) -> None:
+        """Добавляет ссылку в список для обработки этим ключом."""
+        self.links_to_process.append(link)
