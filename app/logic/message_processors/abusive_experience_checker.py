@@ -1,7 +1,5 @@
 import asyncio
-import json
 import logging
-from asyncio import Semaphore
 
 import httpx
 from app.adapters.orm.result import ResultStatus
@@ -23,159 +21,122 @@ class AbusiveExperienceChecker(AbstractMessageChecker):
             broker: BaseBroker,
             api_keys_entity: list[APIKeyEntity],
             queue: str = "abusive_exp",
-            max_concurrent_requests: int = 10,
     ) -> None:
-        self.semaphore: Semaphore = Semaphore(max_concurrent_requests)
         self.broker: BaseBroker = broker
         self.api_key_repo: AbstractAPIKeyRepository = api_key_repo
-        self.api_key_locks = {key.api_key: asyncio.Lock() for key in api_keys_entity}
         self.api_keys: list[APIKeyEntity] = api_keys_entity
         self.queue: str = queue
 
-    async def process_batch(
-            self,
-            messages: list[bytes],
-    ) -> dict[str, bool]:
+    async def process_batch(self) -> dict[str, ResultStatus]:
+        """Обрабатывает все ссылки для всех ключей."""
         results = {}
 
-        tasks = []
-        logger.info(
-            "Обработка сообщений начата.\n"
-            f"Количество сообщений в очереди: {len(messages)}",
-        )
-        for m in messages:
-            tasks.append(self._process_message(m, results))
+        logger.info(f"Начинаем обработку ссылок для {len(self.api_keys)} ключей.")
+
+        tasks = [self._process_key(key, results) for key in self.api_keys]
 
         await asyncio.gather(*tasks)
 
         logger.info(
-            "Обработка сообщений завершена.\n"
-            f"Количество обработанных сообщений: {len(results)}",
+            "Обработка завершена.\n"
+            f"Количество обработанных ссылок: {len(results)}.",
         )
         return results
 
-    async def _process_message(
-            self,
-            message: bytes,
-            results: dict[str, str],
-    ) -> None:
-        try:
-            message_data = json.loads(message)
-            for Id, link in message_data.items():
-                await self._process_link(Id, link, results)
-        except Exception as e:
-            logger.error(f"Ошибка обработки сообщения: {e}")
+    async def _process_key(self, key: APIKeyEntity, results: dict[str, ResultStatus]) -> None:
+        """Обрабатывает все ссылки, связанные с данным ключом."""
+        logger.info(f"Начинаем обработку ключа {key.key_id} с {len(key.links_to_process)} ссылками.")
+        remaining_links: list[bytes] = []
+        tasks = []
+
+        for link_data in key.links_to_process:
+            for link_id, link_url in link_data.items():
+                if not key.is_valid:
+                    logger.warning(f"Ключ {key.key_id} недействителен. Ссылка {link_id} пропущена.")
+                    remaining_links.append(orjson.dumps({link_id: link_url}))
+                    continue
+
+                tasks.append(self._process_link(link_id, link_url, key, results))
+
+        if tasks:
+            await asyncio.gather(*tasks)
+
+        if remaining_links:
+            await self._publish_batch_in_queue(remaining_links)
 
     async def _process_link(
             self,
             link_id: str,
             link: str,
-            results: dict[str, str],
+            key: APIKeyEntity,
+            results: dict[str, ResultStatus],
     ) -> None:
-        async with self.semaphore:
-            for index, key in enumerate(self.api_keys):
-                if not key.is_valid:
-                    logger.warning(f"Ключ {key.api_key} заблокирован или недействителен.")
-                    await self.check_last_key_and_push_message(index, link_id, link)
-                    continue
+        """Обрабатывает одну ссылку с учетом ограничений на количество
+        запросов."""
 
-                if key.limit <= 0:
-                    logger.warning(f"Ключ {key.api_key} исчерпал лимит.")
-                    await self.check_last_key_and_push_message(index, link_id, link)
-                    continue
+        async with key.semaphore:
+            headers_generator = Headers(browser="chrome", os="win", headers=True)
+            headers = headers_generator.generate()
+            proxy_url = key.get_proxy_url()
 
-                lock = self.api_key_locks.get(key.api_key)
-
-                if lock:
-                    if lock.locked() and index == len(self.api_keys) - 1:
-                        logger.warning(f"Ключ {key.key_id} последний и заблокирован, ждем завершения.")
-                        await lock.acquire()
-
-                    elif lock.locked() and index < len(self.api_keys) - 1:
-                        logger.warning(f"Ключ не последний {key.key_id} и заблокирован, пробуем следующий.")
-                        continue
-
-                    await lock.acquire()
-
-                    headers_generator = Headers(
-                        browser="chrome",
-                        os="win",
-                        headers=True,
+            try:
+                async with httpx.AsyncClient(
+                        proxies={"http": proxy_url, "https": proxy_url} if proxy_url else None,
+                ) as client:
+                    # => Отправляем запрос к API "Abusive Experience Report"
+                    response = await client.get(
+                        f'https://abusiveexperiencereport.googleapis.com/v1/sites/{link}',
+                        headers=headers,
+                        params={"key": key.api_key},
                     )
 
-                    headers = headers_generator.generate()
-                    proxy_url = key.get_proxy_url()
+                    if response.status_code == httpx.codes.OK:
+                        data = response.json()
 
-                    try:
-                        async with httpx.AsyncClient(
-                                proxies={"http": proxy_url, "https": proxy_url} if proxy_url else None,
-                        ) as client:
-                            # => Отправляем запрос к API "Abusive Experience Report"
-                            response = await client.get(
-                                f'https://abusiveexperiencereport.googleapis.com/v1/sites/{link}',
-                                headers=headers,
-                                params={"key": key.api_key},
-                            )
+                        # => Проверяем статус сайта на наличие нарушений
+                        abusive_status = data.get("abusiveStatus")
 
-                            if response.status_code == httpx.codes.OK:
-                                data = response.json()
+                        if abusive_status == "FAILING":
+                            # => Сайт признан нарушающим (FAILING)
+                            is_abusive = ResultStatus.FAIL
+                        elif abusive_status == "WARNING":
+                            # => Сайт под предупреждением, но не нарушает
+                            is_abusive = ResultStatus.GOOD
+                        elif abusive_status == "PASSING":
+                            is_abusive = ResultStatus.GOOD
+                        else:
+                            is_abusive = ResultStatus.EMPTY
 
-                                # => Проверяем статус сайта на наличие нарушений
-                                abusive_status = data.get("abusiveStatus")
+                        results[link_id] = is_abusive
 
-                                if abusive_status == "FAILING":
-                                    # => Сайт признан нарушающим (FAILING)
-                                    is_abusive = ResultStatus.FAIL
-                                elif abusive_status == "WARNING":
-                                    # => Сайт под предупреждением, но не нарушает
-                                    is_abusive = ResultStatus.GOOD
-                                elif abusive_status == "PASSING":
-                                    is_abusive = ResultStatus.GOOD
-                                else:
-                                    is_abusive = ResultStatus.EMPTY
+                        await self.api_key_repo.update_key_usage(key_id=key.key_id)
 
-                                results[link_id] = is_abusive
+                    elif response.status_code in [httpx.codes.UNAUTHORIZED, httpx.codes.FORBIDDEN]:
+                        logger.warning(f"API ключ {key.api_key} заблокирован или недействителен.")
+                        await self.api_key_repo.mark_as_invalid(key_id=key.key_id)
+                        key.is_valid = False
+                        await self.api_key_repo.mark_as_invalid(key_id=key.key_id)
+                        await self._push_message_back_in_queue(link_id, link)
 
-                                key.used_limit += 1
-                                await self.api_key_repo.update_key_usage(key_id=key.key_id)
-                                if key.delay:
-                                    await asyncio.sleep(key.delay)
-                                break
-
-                            elif response.status_code in [httpx.codes.UNAUTHORIZED, httpx.codes.FORBIDDEN]:
-                                logger.warning(f"API ключ {key.api_key} заблокирован или недействителен.")
-                                await self.api_key_repo.mark_as_invalid(key_id=key.key_id)
-                                key.is_valid = False
-                                await self.check_last_key_and_push_message(index, link_id, link)
-                                continue
-
-                            elif response.status_code == httpx.codes.TOO_MANY_REQUESTS:
-                                logger.warning(f"API ключ {key.api_key} превысил лимит запросов.")
-                                await self.check_last_key_and_push_message(index, link_id, link)
-                                await asyncio.sleep(15)
-                                continue
-                            else:
-                                results[link_id] = ResultStatus.WAITING
-                                key.used_limit += 1
-                                await self.api_key_repo.update_key_usage(key_id=key.key_id)
-                                await self.broker.publish_message(
-                                    queue_name=self.queue,
-                                    message=orjson.dumps({link_id: link}),
-                                )
-                    except httpx.HTTPStatusError as e:
-                        logger.error(f"HTTP ошибка при запросе: {e}")
+                    elif response.status_code == httpx.codes.TOO_MANY_REQUESTS:
+                        logger.warning(f"API ключ {key.api_key} превысил лимит запросов.")
+                        await self._push_message_back_in_queue(link_id, link)
+                    else:
                         results[link_id] = ResultStatus.WAITING
-                        await self.broker.publish_message(
-                            queue_name=self.queue,
-                            message=orjson.dumps({link_id: link}),
-                        )
-                    finally:
-                        if lock:
-                            lock.release()
+                        await self.api_key_repo.update_key_usage(key_id=key.key_id)
+                        await self._push_message_back_in_queue(link_id, link)
 
-    async def check_last_key_and_push_message(self, index: int, link_id: str, link: str) -> None:
-        if index == len(self.api_keys) - 1:
-            await self.broker.publish_message(
-                queue_name=self.queue,
-                message=orjson.dumps({link_id: link}),
-            )
+            except httpx.HTTPStatusError as e:
+                logger.error(f"HTTP ошибка при запросе: {e}")
+                results[link_id] = ResultStatus.WAITING
+                await self._push_message_back_in_queue(link_id, link)
+
+    async def _push_message_back_in_queue(self, link_id: str, link: str) -> None:
+        await self.broker.publish_message(
+            queue_name=self.queue,
+            message=orjson.dumps({link_id: link}),
+        )
+
+    async def _publish_batch_in_queue(self, remaining_links: list[bytes]) -> None:
+        """Отправляет оставшиеся необработанные ссылки в очередь."""
+        await self.broker.publish_batch(self.queue, remaining_links)

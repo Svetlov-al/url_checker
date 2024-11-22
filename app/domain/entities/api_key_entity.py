@@ -1,3 +1,4 @@
+from asyncio import Semaphore
 from dataclasses import (
     dataclass,
     field,
@@ -17,6 +18,10 @@ class APIKeyEntity:
     proxies: list[ProxyEntity] = field(default_factory=list)
     links_to_process: list[dict[str, str]] = field(default_factory=list)
     delay: int | None = None
+    semaphore: Semaphore = field(init=False)
+
+    def __post_init__(self):
+        self.semaphore = Semaphore(10)
 
     @property
     def limit(self) -> int:

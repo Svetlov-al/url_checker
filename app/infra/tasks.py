@@ -9,8 +9,8 @@ from ..core.constance import (
 )
 from ..domain.entities.result_entity import ResultEntity
 from ..logic.message_processors.base import AbstractMessageChecker
-from ..logic.service_layer.helpers.distribute_links import _distribute_links_among_keys
-from ..logic.service_layer.helpers.prepare_messages import _prepare_messages
+from ..logic.service_layer.helpers.distribute_links import _distribute_links_among_keys  # noqa
+from ..logic.service_layer.helpers.prepare_messages import _prepare_messages  # noqa
 from .broker.base import BaseBroker
 from .celery_worker import app as celery_app
 from .ioc.container.application import AppContainer
@@ -80,18 +80,26 @@ async def ae_validate_async(queue: str) -> dict[int, str]:
     result_repo: AbstractResultRepository = container.infrastructure.result_repo()
 
     api_keys = await api_key_repo.load_keys_from_db(keys_type=APIKeySourceType.ABUSIVE_EXPERIENCE)
+
+    total_requests = 0
+    key_limits = {}
+    for key in api_keys:
+        total_requests += key.limit
+        key_limits[key.api_key] = key.limit
+
+    messages = await broker.read_messages(queue_name=queue, count=total_requests)
+
+    links = _prepare_messages(messages=messages)
+
+    # => Распределяем сообщения по ключам, добавляя их в список APIKeyEntity.links_to_process
+    _distribute_links_among_keys(api_keys, links, key_limits)
+
     ae_message_checker: AbstractMessageChecker = container.infrastructure.ae_message_checker(
         api_keys_entity=api_keys,
         queue=queue,
     )
 
-    total_requests = 0
-    for key in api_keys:
-        total_requests += key.limit
-
-    messages = await broker.read_messages(queue_name=queue, count=total_requests)
-
-    results = await ae_message_checker.process_batch(messages)
+    results = await ae_message_checker.process_batch()
 
     links_to_update = [
         ResultEntity(
