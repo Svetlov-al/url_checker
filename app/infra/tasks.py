@@ -17,6 +17,12 @@ from .ioc.container.application import AppContainer
 
 
 @celery_app.task
+def reset_keys_limit() -> None:
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(reset_keys_limit_async())
+
+
+@celery_app.task
 def vt_validate(queue: str = 'virus_total') -> dict[int, str]:
     loop = asyncio.get_event_loop()
     return loop.run_until_complete(vt_validate_async(queue))
@@ -111,3 +117,9 @@ async def ae_validate_async(queue: str) -> dict[int, str]:
     await result_repo.create_or_update_abusive_experience(results=links_to_update)
 
     return results
+
+
+async def reset_keys_limit_async() -> None:
+    container = AppContainer()
+    api_key_repo: AbstractAPIKeyRepository = container.infrastructure.api_key_repo()
+    await api_key_repo.reset_daily_limits()
