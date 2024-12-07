@@ -20,6 +20,20 @@ services:
     env_file:
       - ../.env
 
+  celery_beat:
+    container_name: celery_beat
+    build: ..
+    command: celery -A app.infra.celery_worker beat --loglevel=info
+    volumes:
+      - ../app:/src/app
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - dev
+    env_file:
+      - ../.env
+
   flower:
     container_name: flower
     build: ..

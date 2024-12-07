@@ -18,18 +18,24 @@ from .ioc.container.application import AppContainer
 
 @celery_app.task
 def reset_keys_limit() -> None:
+    """Задача на обновление ключей Каждый день сбрасывает лимит по ключам для
+    запросов к API."""
     loop = asyncio.get_event_loop()
     return loop.run_until_complete(reset_keys_limit_async())
 
 
 @celery_app.task
 def vt_validate(queue: str = 'virus_total') -> dict[int, str]:
+    """Задача выгружает из очереди ссылки для обработки в системе VirusTotal
+    :param queue: str = virus_total :return: dict[int, str]"""
     loop = asyncio.get_event_loop()
     return loop.run_until_complete(vt_validate_async(queue))
 
 
 @celery_app.task
 def ae_validate(queue: str = 'abusive_exp') -> dict[int, str]:
+    """Задача выгружает из очереди ссылки для обработки в системе Abusive
+    Experience :param queue: str = abusive_exp :return: dict[int, str]"""
     loop = asyncio.get_event_loop()
     return loop.run_until_complete(ae_validate_async(queue))
 
