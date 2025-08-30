@@ -6,7 +6,6 @@ from app.database.settings.base import Base
 from sqlalchemy import (
     DateTime,
     ForeignKey,
-    Integer,
 )
 from sqlalchemy.dialects.mysql import ENUM
 from sqlalchemy.orm import (
@@ -14,6 +13,7 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
 )
+from sqlalchemy.sql.sqltypes import BigInteger
 
 
 class ResultStatus(StrEnum):
@@ -26,7 +26,7 @@ class ResultStatus(StrEnum):
 class ResultModel(Base, TimestampMixin):
     __tablename__ = "result"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # noqa: A003
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)  # noqa: A003
 
     virus_total: Mapped[ResultStatus] = mapped_column(
         ENUM(ResultStatus),
@@ -39,7 +39,7 @@ class ResultModel(Base, TimestampMixin):
         default=ResultStatus.WAITING,
     )
 
-    link_id: Mapped[int] = mapped_column(Integer, ForeignKey("link.id", ondelete="CASCADE"), unique=True)
+    link_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("link.id", ondelete="CASCADE"), unique=True)
     link: Mapped["LinkModel"] = relationship("LinkModel", back_populates="result")  # noqa
 
     complete_date: Mapped[datetime] = mapped_column(

@@ -29,17 +29,17 @@ class InfrastructureContainer(containers.DeclarativeContainer):
 
     link_repo: Factory[AbstractLinkRepository] = providers.Factory(
         LinkRepository,
-        session_factory=core.db.provided.session,
+        session=core.session.provided,
     )
 
     result_repo: Factory[AbstractResultRepository] = providers.Factory(
         ResultRepository,
-        session_factory=core.db.provided.session,
+        session=core.session.provided,
     )
 
     api_key_repo: Factory[AbstractAPIKeyRepository] = providers.Factory(
         APIKeyRepository,
-        session_factory=core.db.provided.session,
+        session=core.session.provided,
     )
 
     vt_message_checker: Factory[AbstractMessageChecker] = providers.Factory(

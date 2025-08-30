@@ -4,7 +4,6 @@ from fastapi import (
 )
 from fastapi.routing import APIRouter
 
-from app.dtos.get_links_dto import GetLinksDTO
 from app.infra.ioc.container.application import AppContainer
 from app.logic.service_layer.get_link_by_title_service import GetLinksByDomainListService
 from app.schemas.get_link_request_schema import GetLinksRequestSchema
@@ -29,14 +28,10 @@ router = APIRouter(tags=["URL's"])
 @inject
 async def get_links_by_domain_list(
     domains: GetLinksRequestSchema,
-    service: GetLinksByDomainListService = Depends(Provide[AppContainer.services.get_links_by_domain_list_service]),
+    service: GetLinksByDomainListService = Depends(Provide(AppContainer.services.get_links_by_domain_list_service)),
 ) -> list[LinkDetailSchema]:
     """Отдает информацию по списку ссылок."""
 
-    params = GetLinksDTO(
-        urls=domains.urls,
-    )
-
-    results = await service.run(params)
+    results = await service.run(domains.links)
 
     return [LinkDetailSchema.from_entity(result) for result in results]

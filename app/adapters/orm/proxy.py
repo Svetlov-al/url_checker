@@ -5,7 +5,6 @@ from app.database.settings.base import Base
 from sqlalchemy import (
     Boolean,
     ForeignKey,
-    Integer,
     String,
 )
 from sqlalchemy.orm import (
@@ -13,12 +12,13 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
 )
+from sqlalchemy.sql.sqltypes import BigInteger
 
 
 class ProxyModel(Base, TimestampMixin):
     __tablename__ = "proxy"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # noqa: A003
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)  # noqa: A003
     url: Mapped[str] = mapped_column(String(255), nullable=False)
     username: Mapped[str | None] = mapped_column(String(255), nullable=True)
     password: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -39,16 +39,13 @@ class ProxyKeysAssociation(Base):
     __tablename__ = 'proxy_keys'
 
     proxy_id: Mapped[int] = mapped_column(
-        ForeignKey(
-            "proxy.id",
-            ondelete="CASCADE",
-        ),
+        BigInteger,
+        ForeignKey("proxy.id", ondelete="CASCADE"),
         primary_key=True,
     )
     key_id: Mapped[int] = mapped_column(
+        BigInteger,
         ForeignKey("api_credential.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    extra_data: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True,
-    )
+    extra_data: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

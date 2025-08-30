@@ -25,7 +25,7 @@ class RedisMessageBroker(BaseBroker):
         try:
             pipeline = self.redis.pipeline()
             for message in messages:
-                pipeline.rpush(queue_name, message)
+                await pipeline.rpush(queue_name, message)
             await pipeline.execute()
         except Exception as e:
             logger.error(
@@ -38,7 +38,7 @@ class RedisMessageBroker(BaseBroker):
         try:
             pipeline = self.redis.pipeline()
             for _ in range(count):
-                pipeline.lpop(queue_name)
+                await pipeline.lpop(queue_name)
             messages = await pipeline.execute()
             return [msg for msg in messages if msg]
         except Exception as e:

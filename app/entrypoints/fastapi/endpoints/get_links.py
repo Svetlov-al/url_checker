@@ -29,7 +29,7 @@ router = APIRouter(tags=["URL's"])
 @inject
 async def get_links(
     filters: GetAllLinksFilters = Depends(),
-    service: GetLinksService = Depends(Provide[AppContainer.services.get_links_service]),
+    service: GetLinksService = Depends(Provide(AppContainer.services.get_links_service)),
 ) -> LinksResponseSchema:
     """Отдает список ссылок."""
     results, count = await service.run(filters=filters.to_infra())

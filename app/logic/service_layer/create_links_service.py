@@ -8,7 +8,6 @@ import orjson
 from app.adapters.repositories.link_repository import AbstractLinkRepository
 from app.adapters.repositories.result_repository import AbstractResultRepository
 from app.domain.entities.link_entity import LinkEntity
-from app.dtos.create_links_dto import CreateLinksDTO
 from app.infra.broker.base import BaseBroker
 from app.logic.service_layer.helpers.normalize_url import normalize_url
 
@@ -19,8 +18,8 @@ class CreateLinksService:
     result_repo: AbstractResultRepository
     redis_broker: BaseBroker
 
-    async def run(self, params: CreateLinksDTO) -> int:
-        normalized_links = [normalize_url(url) for url in params.links]
+    async def run(self, links: list[str]) -> int:
+        normalized_links = [normalize_url(url) for url in links]
 
         links = [LinkEntity(url=link) for link in normalized_links]
 

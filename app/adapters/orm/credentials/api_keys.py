@@ -13,6 +13,7 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
 )
+from sqlalchemy.sql.sqltypes import BigInteger
 
 
 class APIKeySourceType(StrEnum):
@@ -23,7 +24,7 @@ class APIKeySourceType(StrEnum):
 class APIKeyModel(Base, TimestampMixin):
     __tablename__ = "api_credential"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # noqa: A003
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)  # noqa: A003
     api_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     is_valid: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     daily_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=500)

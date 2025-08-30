@@ -6,5 +6,5 @@ class GetAllLinksFilters(BaseModel):
     limit: int = 10
     offset: int = 0
 
-    def to_infra(self):
+    def to_infra(self) -> GetAllLinksInfraFilters:
         return GetAllLinksInfraFilters(limit=self.limit, offset=self.offset)

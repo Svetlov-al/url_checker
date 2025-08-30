@@ -3,9 +3,9 @@ networks:
     driver: bridge
 
 services:
-  db:
+  mariadb:
     image: mariadb:10.6.8
-    container_name: db
+    container_name: mariadb
     ports:
       - ${DB_PORT:?}:3306
     volumes:

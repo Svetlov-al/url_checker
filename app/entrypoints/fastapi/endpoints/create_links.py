@@ -6,7 +6,6 @@ from fastapi import (
 from fastapi.routing import APIRouter
 
 from app.domain.exceptions.base import ApplicationException
-from app.dtos.create_links_dto import CreateLinksDTO
 from app.infra.ioc.container.application import AppContainer
 from app.logic.service_layer.create_links_service import CreateLinksService
 from app.schemas.base import ErrorSchema
@@ -33,12 +32,11 @@ router = APIRouter(tags=["URL's"])
 @inject
 async def create_urls(
     schema: CreateUrlRequestSchema,
-    service: CreateLinksService = Depends(Provide[AppContainer.services.create_links_service]),
+    service: CreateLinksService = Depends(Provide(AppContainer.services.create_links_service)),
 ) -> CreateLinksResponseSchema:
     """Сохранить ссылки."""
-    params = CreateLinksDTO(links=schema.links)
     try:
-        result = await service.run(params)
+        result = await service.run(schema.links)
     except ApplicationException as exc:
         raise HTTPException(status_code=400, detail={'error': exc.message})
 
